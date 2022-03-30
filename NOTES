@@ -1,0 +1,34 @@
+
+hife init "--name=feh" "--spin=4" "--charge=-1"
+
+hife mf 1 "--method=uks"
+hife create mf 1
+hife submit mf 1
+
+hife cc 2 "--load_mf=mf-1"
+hife create cc 2
+hife submit cc 2
+
+hife act 8 "--load_mf=mf-1"
+hife create act 8
+hife ex act 8
+
+hife orb 9 "--load_mf=mf-1" "--load_coeff=act-8" "--from=50" "--to=80"
+hife create orb 9
+hife ex orb 9
+
+hife select 10 57-65 "--load_mf=mf-1" "--load_coeff=act-8"
+hife create select 10
+hife ex select 10
+
+hife casci 13 "--load_mf=mf-1" "--load_coeff=select-10"
+hife create casci 13
+hife submit casci 13
+
+hife casscf 14 "--load_mf=mf-1" "--load_coeff=select-10"
+hife create casscf 14
+hife submit casscf 14
+
+hife mrpt 15 "--load_mf=mf-1" "--load_coeff=casscf-14" "--method=sc-nevpt2"
+hife create mrpt 15
+hife submit mrpt 15
