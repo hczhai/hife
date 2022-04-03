@@ -6,7 +6,6 @@
 #SBATCH -q regular
 #SBATCH --nodes=@NNODES
 #SBATCH --time=@TIME
-#SBATCH --partition=@PART
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=@NCORES
 #SBATCH --no-requeue
