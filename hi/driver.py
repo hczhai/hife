@@ -10,7 +10,7 @@ HIFEHOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def get_host():
     xhost = os.popen("hostname -f | grep '\\.' || hostname -a").read().strip()
     xhost = xhost.lower()
-    keys = ['pauling', 'mac']
+    keys = ['pauling', 'mac', 'cori']
     for k in keys:
         if k in xhost:
             return k
@@ -20,8 +20,8 @@ def get_host():
             return v
     return 'unknown'
 
-host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24 }
-host_part = {'pauling': 'serial,parallel', 'hpc': '', 'mac': '' }
+host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24, 'cori': 32 }
+host_part = {'pauling': 'serial,parallel', 'hpc': '', 'mac': '', 'cori': '' }
 extra_basis = { 'def2-sv(p)': 'def2-svpp.dat' }
 
 def time_span_str(time, no_sec=False):
@@ -105,7 +105,7 @@ class HFDriver(BaseDriver):
         super().__init__(argv)
         self.tasks = ["init", "show", "clean", "mf", "cc",
             "set", "create", "submit", "log", "act", "orb",
-            "ex", "select", "casci", "casscf", "mrpt"]
+            "ex", "select", "casci", "casscf", "mrpt", "avas"]
 
     def run(self):
         super().run()
@@ -239,7 +239,7 @@ class HFDriver(BaseDriver):
         opts = {
             "max_cycle": "1000"
         }
-        optl = [ "load_mf", "level_shift" ] + list(opts.keys())
+        optl = [ "load_mf", "level_shift", "frozen" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
@@ -334,6 +334,29 @@ class HFDriver(BaseDriver):
         print("%s mol based on %s" % (sec_key, pre[sec_key]["load_mf"]))
         print("%s orb based on %s" % (sec_key, pre[sec_key]["load_coeff"]))
         write_json(pre, "./hife-parameters.json")
+
+    def avas(self, args):
+        """Select active space automatically using avas."""
+        pre = self.pre_info()
+        self.to_dir(dox="local")
+        def_pos = { "0": "stage", "1": "ao_labels" }
+        opts = { "threshold": "0.2" }
+        optl = [ "load_mf", "ao_labels" ] + list(opts.keys())
+        opts.update(read_opts(args, def_pos, optl))
+        for k in [ "stage", "load_mf", "ao_labels" ]:
+            if k not in opts:
+                raise RuntimeError("no %s argument found!" % k)
+        sec_key = "avas-%s" % opts["stage"]
+        if sec_key in pre:
+            raise RuntimeError("key %s already used!" % sec_key)
+        if opts["load_mf"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_mf"])
+        pre[sec_key] = {}
+        for k in optl:
+            if k in opts:
+                pre[sec_key][k] = opts[k]
+        print("%s based on %s" % (sec_key, pre[sec_key]["load_mf"]))
+        write_json(pre, "./hife-parameters.json")
     
     def casci(self, args, do_casci=True):
         """CASCI/CASSCF calculation."""
@@ -341,12 +364,15 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         def_pos = { "0": "stage" }
         opts = {
-            "max_cycle": "500",
+            "max_cycle": "50",
             "fci_conv_tol": "1E-10",
             "conv_tol": "1E-8",
+            "frac_occ_tol": "1E-6",
+            "nrepeat" : "2"
         }
-        optl = [ "load_mf", "load_coeff", "spin",
-            "nactorb", "nactelec" ] + list(opts.keys())
+        optl = [ "load_mf", "load_coeff", "spin", "nactorb", "nactelec",
+            "stackblock-dmrg", "block2-dmrg", "maxm",
+            "step_size", "ci_response_space", "mixspin" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -374,7 +400,7 @@ class HFDriver(BaseDriver):
         pre = self.pre_info()
         self.to_dir(dox="local")
         def_pos = { "0": "stage" }
-        opts = { "fci_conv_tol": "1E-10" }
+        opts = { "fci_conv_tol": "1E-10", "frac_occ_tol": "1E-6" }
         optl = [ "load_mf", "load_coeff", "spin",
             "nactorb", "nactelec", "method", "solver" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
@@ -440,6 +466,9 @@ class HFDriver(BaseDriver):
         elif args[0] == "select":
             from .solver.select import write
             write("%s/hife.py" % xdir, pre[sec_key])
+        elif args[0] == "avas":
+            from .solver.avas import write
+            write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]])
         elif args[0] == "casci":
             from .solver.casci import write
             write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]], is_casci=True)
@@ -459,9 +488,12 @@ class HFDriver(BaseDriver):
             "@TIME": opts["time"],
             "@NAME": opts["name"],
             "@PART": opts["partition"],
-            "@TMPDIR": rdir
+            "@TMPDIR": rdir,
+            "@RESTART": "0"
         }
         optcopy(self.scripts_render.get("run.sh"), "%s/run.sh" % xdir, ropts)
+        ropts["@RESTART"] = "1"
+        optcopy(self.scripts_render.get("run.sh"), "%s/restart.sh" % xdir, ropts)
 
     def ex(self, args):
         """Execute job scripts on this node."""
@@ -484,11 +516,11 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude" ] + list(opts.keys())
+        optl = [ "exclude", "restart" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
         os.chdir('%s/runs/%s' % (lr[0], sec_key))
-        l = "run.sh"
+        l = "restart.sh" if "restart" in opts else "run.sh"
         if "exclude" in opts:
             cmd = "sed -i '3 i\\#SBATCH --exclude=:%s' %s" % (opts["exclude"], l)
             print(os.popen(cmd).read().strip())
@@ -615,11 +647,13 @@ class HFDriver(BaseDriver):
                 print("   PLOT --- cd %s/runs/%s; jmol orbs.spt; cd -" % (lr[0], k))
             if k.startswith("select-"):
                 print("   ACT %s --- (%do, %de)" % (v["cas_list"], acto, acte))
+            if k.startswith("avas-"):
+                print("   ACT %s --- (%do, %de)" % (v["ao_labels"], acto, acte))
             xf = "%s/runs/%s/JOBIDS" % (lr[0], k)
             jid = open(xf, "r").readlines()[-1].strip() if os.path.isfile(xf) else '?'
             if xff is not None:
                 print("   FILE = %s JOBID = %s" % (xff, jid))
-                if k.split("-")[0] not in ["orb", "select", "act"]:
+                if k.split("-")[0] not in ["orb", "select", "act", "avas"]:
                     if len(ex) > 50:
                         print("   E = %s\n   NITER = %d T = %s" % (ex, niter, tx))
                     else:

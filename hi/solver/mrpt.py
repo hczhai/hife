@@ -16,7 +16,9 @@ CASCI = """
 from pyscf import mcscf
 import os
 
-for fname in ["mo_coeff.npy", "lo_coeff.npy", "nat_coeff.npy"]:
+mcscf.casci.FRAC_OCC_THRESHOLD = %s
+
+for fname in ["mo_coeff.npy", "lo_coeff.npy", "mc_mo_coeff.npy", "nat_coeff.npy"]:
     if os.path.isfile(lde + "/" + fname):
         print("use: " + lde + "/" + fname)
         coeff = np.load(lde + "/" + fname)
@@ -49,12 +51,14 @@ mf.mo_coeff = coeff
 
 mc = mcscf.CASCI(mf, nactorb, (nacta, nactb))
 mc.fcisolver.conv_tol = %s
+mc.canonicalization = True
+mc.natorb = True
 mc.kernel()
 """
 
 SCNEVPT2 = """
 from pyscf import mrpt
-sc = mrpt.NEVPT(mc).run()
+sc = mrpt.NEVPT(mc).set(canonicalized=True).run()
 """
 
 ICNEVPT2 = """
@@ -100,7 +104,10 @@ def write(fn, pmc, pmf):
         else:
             f.write("spin = None\n")
 
-        f.write(CASCI % pmc["fci_conv_tol"])
+        f.write(CASCI % (
+            pmc["frac_occ_tol"],
+            pmc["fci_conv_tol"])
+        )
 
         if pmc["method"] == "sc-nevpt2":
             if "solver" in pmc and pmc["solver"] == "block2":

@@ -16,10 +16,10 @@ fi
 which orterun
 
 if [ "$?" = "1" ] || [ "${SLURM_TASKS_PER_NODE}" = "" ]; then
-    python3 hife.py > hife.out.${TJ}
+    python3 hife.py @RESTART > hife.out.${TJ}
 else
     orterun --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
-        python3 hife.py > hife.out.${TJ}
+        python3 hife.py @RESTART > hife.out.${TJ}
 fi
 
 if [ "$?" = "0" ]; then

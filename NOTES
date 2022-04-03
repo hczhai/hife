@@ -32,3 +32,23 @@ hife submit casscf 14
 hife mrpt 15 "--load_mf=mf-1" "--load_coeff=casscf-14" "--method=sc-nevpt2"
 hife create mrpt 15
 hife submit mrpt 15
+
+casscf conv problem
+-------------------
+
+https://github.com/pyscf/pyscf/issues/683
+
+Some settings may be helpful: reducing .max_cycle_micro (default 4), increase
+.ci_response_space (default 4), reducing .ah_grad_trust_region (default 3.0).
+
+mc.ci_response_space = 20
+mc.ah_grad_trust_region = 0.05
+mc.ah_max_cycle = 100
+mc.ah_conv_tol = 1E-14
+mc.max_stepsize = 0.5
+mc.mc2step()
+
+ccsd(t)
+-------
+
+https://github.com/pyscf/pyscf/issues/583

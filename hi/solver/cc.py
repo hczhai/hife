@@ -13,13 +13,41 @@ mf.mo_occ = mfx["mo_occ"]
 """
 
 CC = """
+
+from sys import argv
+import os
+is_restart = len(argv) >= 2 and argv[1] == "1"
+
+if not is_restart:
+    for fname in ['/ccdiis.h5', '/ccdiis-lambda.h5']:
+        if os.path.isfile(lib.param.TMPDIR + fname):
+            fid = 1
+            while os.path.isfile(lib.param.TMPDIR + fname + '.%%d' %% fid):
+                fid += 1
+            os.rename(lib.param.TMPDIR + fname,
+                lib.param.TMPDIR + fname + '.%%d' %% fid)
+
 from pyscf import cc
 mc = cc.CCSD(mf)
+mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
+mc.max_cycle = %s
+"""
+
+CC_FROZEN = """
+from pyscf import cc
+mc = cc.CCSD(mf, frozen=%s)
+mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
 """
 
 CC_FINAL = """
-mc.kernel()
+if is_restart and os.path.isfile(lib.param.TMPDIR + '/ccdiis.h5'):
+    print("restart ccsd from ", lib.param.TMPDIR + '/ccdiis.h5')
+    mc.restore_from_diis_(lib.param.TMPDIR + '/ccdiis.h5')
+    t1, t2 = mc.t1, mc.t2
+    mc.kernel(t1, t2)
+else:
+    mc.kernel()
 e_ccsd = mc.e_tot
 print('ECCSD    = ', e_ccsd)
 print("PART TIME (CCSD) = %20.3f" % (time.perf_counter() - txst))
@@ -28,6 +56,19 @@ e_ccsd_t = e_ccsd + mc.ccsd_t()
 print('ECCSD(T) = ', e_ccsd_t)
 print("PART TIME (CCSD(T))  = %20.3f" % (time.perf_counter() - txst))
 
+mc.diis_file = lib.param.TMPDIR + '/ccdiis-lambda.h5'
+if is_restart and os.path.isfile(lib.param.TMPDIR + '/ccdiis-lambda.h5'):
+    print("restart ccsd-lambda from ", lib.param.TMPDIR + '/ccdiis-lambda.h5')
+    from pyscf import lib
+    ccvec = lib.diis.restore(lib.param.TMPDIR + '/ccdiis-lambda.h5').extrapolate()
+    l1, l2 = mc.vector_to_amplitudes(ccvec)
+    mc.restore_from_diis_(lib.param.TMPDIR + '/ccdiis-lambda.h5')
+    mc.solve_lambda(mc.t1, mc.t2, l1, l2)
+else:
+    mc.solve_lambda(mc.t1, mc.t2)
+print("PART TIME (CCSD-lambda)  = %20.3f" % (time.perf_counter() - txst))
+
+import numpy as np
 dm = mc.make_rdm1()
 if dm[0].ndim == 2:
     mc_occ = np.diag(dm[0]) + np.diag(dm[1])
@@ -89,7 +130,10 @@ def write(fn, pmc, pmf):
             f.write("mfhf.__dict__.update(mf.__dict__)\n")
             f.write("mf = mfhf\n")
 
-        f.write(CC % (pmc["max_cycle"]))
+        if "frozen" in pmc:
+            f.write(CC_FROZEN % (pmc["frozen"], pmc["max_cycle"]))
+        else:
+            f.write(CC % (pmc["max_cycle"]))
 
         if "level_shift" in pmc:
             f.write("mc.level_shift = %s\n" % pmc["level_shift"])

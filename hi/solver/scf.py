@@ -34,7 +34,7 @@ def write(fn, pmf):
         f.write(TIME_ST)
 
         gemo = open(pmf["geometry"]).readlines()
-        assert int(gemo[0]) == len(gemo) + 2
+        assert int(gemo[0]) == len(gemo) - 2
 
         f.write(MOL % (
             "".join(gemo[2:]),
