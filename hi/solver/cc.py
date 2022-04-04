@@ -2,9 +2,12 @@
 from .mol import TIME_ST, TIME_ED
 
 MF_LOAD = """
-from pyscf import scf
+from pyscf import scf, lib
 mfchk = "%s"
 mol, mfx = scf.chkfile.load_scf(mfchk)
+if spin is not None:
+    mol.spin = spin
+    mol.build()
 mf = %s
 mf.chkfile = "mf.chk"
 mf.mo_coeff = mfx["mo_coeff"]
@@ -117,6 +120,11 @@ def write(fn, pmc, pmf):
         lde = pmc["load_mf"]
         if "/" not in lde:
             lde = "../" + lde
+
+        if "spin" in pmc:
+            f.write("spin = %s\n" % pmc["spin"])
+        else:
+            f.write("spin = None\n")
 
         f.write(MF_LOAD % (lde + "/mf.chk", mme))
 
