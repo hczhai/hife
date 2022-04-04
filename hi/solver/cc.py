@@ -15,8 +15,7 @@ mf.mo_energy = mfx["mo_energy"]
 mf.mo_occ = mfx["mo_occ"]
 """
 
-CC = """
-
+CC_PRE = """
 from sys import argv
 import os
 is_restart = len(argv) >= 2 and argv[1] == "1"
@@ -25,11 +24,13 @@ if not is_restart:
     for fname in ['/ccdiis.h5', '/ccdiis-lambda.h5']:
         if os.path.isfile(lib.param.TMPDIR + fname):
             fid = 1
-            while os.path.isfile(lib.param.TMPDIR + fname + '.%%d' %% fid):
+            while os.path.isfile(lib.param.TMPDIR + fname + '.%d' % fid):
                 fid += 1
             os.rename(lib.param.TMPDIR + fname,
-                lib.param.TMPDIR + fname + '.%%d' %% fid)
+                lib.param.TMPDIR + fname + '.%d' % fid)
+"""
 
+CC = """
 from pyscf import cc
 mc = cc.CCSD(mf)
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
@@ -137,6 +138,8 @@ def write(fn, pmc, pmf):
                 f.write("mfhf = scf.sfx2c(mfhf)\n")
             f.write("mfhf.__dict__.update(mf.__dict__)\n")
             f.write("mf = mfhf\n")
+
+        f.write(CC_PRE)
 
         if "frozen" in pmc:
             f.write(CC_FROZEN % (pmc["frozen"], pmc["max_cycle"]))
