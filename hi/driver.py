@@ -452,6 +452,10 @@ class HFDriver(BaseDriver):
                 if bname in pre[sec_key]["basis"]:
                     copyfile(self.basis_dir + "/" + bfile, "%s/%s" % (xdir, bfile))
                     pre[sec_key]["basis"] = pre[sec_key]["basis"].replace(bname, bfile)
+        if "load_mf" in pre[sec_key] and "basis" in pre[pre[sec_key]["load_mf"]]:
+            for _, bfile in extra_basis.items():
+                if bfile in pre[pre[sec_key]["load_mf"]]["basis"]:
+                    copyfile(self.basis_dir + "/" + bfile, "%s/%s" % (xdir, bfile))
         if args[0] == "mf":
             from .solver.scf import write
             write("%s/hife.py" % xdir, pre[sec_key])
