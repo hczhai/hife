@@ -3,7 +3,7 @@
 #SBATCH --job-name @NAME
 #SBATCH -o LOG.%j
 #SBATCH -C haswell
-#SBATCH -q regular
+#SBATCH -q @QUEUE
 #SBATCH --nodes=@NNODES
 #SBATCH --time=@TIME
 #SBATCH --ntasks-per-node=1

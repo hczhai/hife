@@ -434,7 +434,8 @@ class HFDriver(BaseDriver):
             "cores": pre["hosts"]["cores"], 
             "name": "%s.%s.hife" % (pre["create"]["name"][:3], args[1]),
             "mem": pre["hosts"]["mem"],
-            "partition": pre["hosts"]["partition"]
+            "partition": pre["hosts"]["partition"],
+            "queue": "regular"
         }
         optl = [] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
@@ -489,7 +490,8 @@ class HFDriver(BaseDriver):
             "@NAME": opts["name"],
             "@PART": opts["partition"],
             "@TMPDIR": rdir,
-            "@RESTART": "0"
+            "@RESTART": "0",
+            "@QUEUE": opts["queue"]
         }
         optcopy(self.scripts_render.get("run.sh"), "%s/run.sh" % xdir, ropts)
         ropts["@RESTART"] = "1"
