@@ -109,7 +109,7 @@ def make_rdm4(**kwargs):
     return E4
 mc.fcisolver.make_rdm4 = make_rdm4
 from pyscf.icmpspt import icmpspt
-e_corr = icmpspt.mrlcc(mc, nfro=0)
+e_corr = icmpspt.mrlcc(mc, nfro=0, third_order=False)
 lib.logger.note(mc, 'E(ICMRLCC) = %.16g  E_corr_pt = %.16g', mc.e_tot + e_corr, e_corr)
 """
 
