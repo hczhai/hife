@@ -237,9 +237,12 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         def_pos = { "0": "stage" }
         opts = {
-            "max_cycle": "1000"
+            "max_cycle": "1000",
+            "bcc_conv_tol": 1E-5,
+            "bcc_max_cycle": 10
         }
-        optl = [ "load_mf", "level_shift", "frozen", "spin" ] + list(opts.keys())
+        optl = [ "load_mf", "load_coeff", "level_shift", "no_ccsd_t",
+            "frozen", "spin", "bcc" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
@@ -249,11 +252,15 @@ class HFDriver(BaseDriver):
             raise RuntimeError("key %s already used!" % sec_key)
         if opts["load_mf"] not in pre:
             raise RuntimeError("%s not found!" % opts["load_mf"])
+        if "load_coeff" in opts and opts["load_coeff"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_coeff"])
         pre[sec_key] = {}
         for k in optl:
             if k in opts:
                 pre[sec_key][k] = opts[k]
-        print("%s based on %s" % (sec_key, pre[sec_key]["load_mf"]))
+        print("%s mol based on %s" % (sec_key, pre[sec_key]["load_mf"]))
+        if "load_coeff" in opts:
+            print("%s orb based on %s" % (sec_key, pre[sec_key]["load_coeff"]))
         write_json(pre, "./hife-parameters.json")
     
     def act(self, args):
@@ -312,7 +319,9 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         def_pos = { "0": "stage", "1": "cas_list" }
         opts = {}
-        optl = [ "load_mf", "load_coeff", "no_loc", "cas_list" ] + list(opts.keys())
+        optl = [ "load_mf", "load_coeff", "no_loc", "cas_list",
+            "nactorb", "nactelec", "split_low", "split_high",
+            "alpha", "beta", "uno" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -328,9 +337,10 @@ class HFDriver(BaseDriver):
         for k in optl:
             if k in opts:
                 pre[sec_key][k] = opts[k]
-        pre[sec_key]["cas_list"] = solve_expr(pre[sec_key]["cas_list"])
-        print("%s active space %s = %d orbitals" % (sec_key,
-            pre[sec_key]["cas_list"], len(pre[sec_key]["cas_list"])))
+        if "cas_list" in pre[sec_key]:
+            pre[sec_key]["cas_list"] = solve_expr(pre[sec_key]["cas_list"])
+            print("%s active space %s = %d orbitals" % (sec_key,
+                pre[sec_key]["cas_list"], len(pre[sec_key]["cas_list"])))
         print("%s mol based on %s" % (sec_key, pre[sec_key]["load_mf"]))
         print("%s orb based on %s" % (sec_key, pre[sec_key]["load_coeff"]))
         write_json(pre, "./hife-parameters.json")
@@ -372,7 +382,11 @@ class HFDriver(BaseDriver):
         }
         optl = [ "load_mf", "load_coeff", "spin", "nactorb", "nactelec",
             "stackblock-dmrg", "block2-dmrg", "maxm",
-            "step_size", "ci_response_space", "mixspin" ] + list(opts.keys())
+            "step_size", "ci_response_space", "mixspin",
+            "no_canonicalize", "dryrun", "dmrg-sch-sweeps", "dmrg-sch-maxms",
+            "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
+            "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
+            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -402,7 +416,7 @@ class HFDriver(BaseDriver):
         def_pos = { "0": "stage" }
         opts = { "fci_conv_tol": "1E-10", "frac_occ_tol": "1E-6" }
         optl = [ "load_mf", "load_coeff", "spin",
-            "nactorb", "nactelec", "method", "solver" ] + list(opts.keys())
+            "nactorb", "nactelec", "method", "solver", "fix_spin" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -498,11 +512,20 @@ class HFDriver(BaseDriver):
             "@PART": opts["partition"],
             "@TMPDIR": rdir,
             "@RESTART": "0",
+            "@BLOCK2": "0",
             "@QUEUE": opts["queue"]
         }
         optcopy(self.scripts_render.get("run.sh"), "%s/run.sh" % xdir, ropts)
         ropts["@RESTART"] = "1"
         optcopy(self.scripts_render.get("run.sh"), "%s/restart.sh" % xdir, ropts)
+        if args[0] == "casci":
+            ropts["@RESTART"] = "0"
+            ropts["@BLOCK2"] = "1"
+            ropts["@NAME"] = opts["name"].replace("hife", "dmrg")
+            optcopy(self.scripts_render.get("run.sh"), "%s/block2-dmrg.sh" % xdir, ropts)
+            ropts["@RESTART"] = "1"
+            ropts["@NAME"] = opts["name"].replace("hife", "drev")
+            optcopy(self.scripts_render.get("run.sh"), "%s/block2-dmrg-rev.sh" % xdir, ropts)
 
     def ex(self, args):
         """Execute job scripts on this node."""
@@ -525,11 +548,18 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude", "restart" ] + list(opts.keys())
+        optl = [ "exclude", "restart", "block2-dmrg", "block2-dmrg-rev" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
         os.chdir('%s/runs/%s' % (lr[0], sec_key))
-        l = "restart.sh" if "restart" in opts else "run.sh"
+        if "block2-dmrg" in opts:
+            l = "block2-dmrg.sh"
+        elif "block2-dmrg-rev" in opts:
+            l = "block2-dmrg-rev.sh"
+        elif "restart" in opts:
+            l = "restart.sh"
+        else:
+            l = "run.sh"
         if "exclude" in opts:
             cmd = "sed -i '3 i\\#SBATCH --exclude=:%s' %s" % (opts["exclude"], l)
             print(os.popen(cmd).read().strip())
@@ -579,11 +609,18 @@ class HFDriver(BaseDriver):
             extra = ''
             xff = None
             ex, tx, niter = '?', '', 0
-            acto, acto = 0, 0
+            acte, acto = 0, 0
+            ssq = ''
             txst = None
+            bdim = None
+            tswp = 0
             xf = "%s/runs/%s/OUTFILE" % (lr[0], k)
             if os.path.isfile(xf):
                 xff = "%s/runs/%s/%s" % (lr[0], k, open(xf, "r").readlines()[-1].strip())
+                if not os.path.isfile(xff):
+                    xdd = xff.replace("hife.out", "dmrg.out")
+                    if os.path.isfile(xdd):
+                        xff = xdd
                 if os.path.isfile(xff):
                     xg = open(xff, "r").readlines()
                     for xgl in xg:
@@ -601,8 +638,19 @@ class HFDriver(BaseDriver):
                             ex = " ".join(xgl.split())
                         elif xgl.startswith("ECCSD(T) ="):
                             ex += " " + " ".join(xgl.split())
+                        elif xgl.startswith("EBCCSD   ="):
+                            ex += " " + " ".join(xgl.split())
+                        elif xgl.startswith("Time sweep ="):
+                            tswp += float(xgl.split("=")[1].split()[0])
+                            niter += 1
+                        elif "| Bond dimension =" in xgl:
+                            bdim = xgl.split("| Bond dimension =")[1].split()[0]
+                        elif xgl.startswith("DMRG Energy =") and bdim is not None:
+                            ex = "EDMRG(M=%s) = " % bdim + xgl.split()[-1]
                         elif xgl.startswith("CASCI E =") and "CASSCF" not in ex:
                             ex = " ".join(xgl.split()[:4])
+                            if "S^2 = " in xgl:
+                                ssq = xgl.split("S^2 = ")[-1].split()[0]
                         elif xgl.startswith("CASSCF energy ="):
                             ex += " ECASSCF = " + xgl.split()[-1]
                         elif xgl.startswith("E(WickICNEVPT2)"):
@@ -611,6 +659,8 @@ class HFDriver(BaseDriver):
                             ex += " SCNEV = " + xgl.split()[2] + " PT = " + xgl.split()[5]
                         elif xgl.startswith("E(WickICMRREPT2)"):
                             ex += " ICMRR = " + xgl.split()[2] + " PT = " + xgl.split()[5]
+                        elif xgl.startswith("E(ICMRLCC)"):
+                            ex += " ICMRL = " + xgl.split()[2] + " PT = " + xgl.split()[5]
                         elif xgl.startswith("Nevpt2 Energy ="):
                             eref = float(ex.split()[-1])
                             ept = float(xgl.split()[3])
@@ -633,6 +683,10 @@ class HFDriver(BaseDriver):
                             acto = int(xgl.split()[2])
                             acte = int(xgl.split()[5])
             print()
+            if tx == '' and tswp != 0:
+                tx = time_span_str(tswp) + " (%.3f)" % tswp
+            if ssq != '':
+                extra += ' S^2 = %s' % ssq
             if k.startswith("mf-"):
                 print("[%s] :: %s/%s/%s :: charge = %s spin = %s%s"
                     % (k, v["method"], v["func"], v["basis"], v["charge"], v["spin"], extra))
@@ -654,7 +708,7 @@ class HFDriver(BaseDriver):
                 print("%s%s" % (xx, extra))
             if k.startswith("orb-"):
                 print("   PLOT --- cd %s/runs/%s; jmol orbs.spt; cd -" % (lr[0], k))
-            if k.startswith("select-"):
+            if k.startswith("select-") and "cas_list" in v:
                 print("   ACT %s --- (%do, %de)" % (v["cas_list"], acto, acte))
             if k.startswith("avas-"):
                 print("   ACT %s --- (%do, %de)" % (v["ao_labels"], acto, acte))

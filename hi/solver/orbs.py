@@ -15,13 +15,13 @@ from pyscf import tools
 import numpy as np
 import os
 
-for fname in ["mo_coeff.npy", "lo_coeff.npy", "nat_coeff.npy"]:
+for fname in ["mo_coeff.npy", "lo_coeff.npy", "mc_mo_coeff.npy", "nat_coeff.npy"]:
     if os.path.isfile(lde + "/" + fname):
         print("use: " + lde + "/" + fname)
         coeff = np.load(lde + "/" + fname)
         break
 
-for fname in ["mf_occ.npy", "lo_occ.npy", "nat_occ.npy"]:
+for fname in ["mf_occ.npy", "lo_occ.npy", "mc_occ.npy", "nat_occ.npy"]:
     if os.path.isfile(lde + "/" + fname):
         print("use: " + lde + "/" + fname)
         mo_occ = np.load(lde + "/" + fname)

@@ -47,8 +47,8 @@ mf.mo_coeff = coeff
 mc = mcscf.%s(mf, nactorb, (nacta, nactb))
 mc.conv_tol = %s
 mc.max_cycle_macro = %s
-mc.canonicalization = True
-mc.natorb = True
+mc.canonicalization = %s
+mc.natorb = %s
 
 mcfs = [mc.fcisolver]
 """
@@ -63,7 +63,7 @@ dmrgscf.settings.MPIPREFIX = ""
 mc.fcisolver = dmrgscf.DMRGCI(mol, maxM=%s, tol=%s)
 mc.fcisolver.runtimeDir = lib.param.TMPDIR
 mc.fcisolver.scratchDirectory = lib.param.TMPDIR
-mc.fcisolver.threads = os.environ["OMP_NUM_THREADS"]
+mc.fcisolver.threads = int(os.environ["OMP_NUM_THREADS"])
 mc.fcisolver.memory = int(mol.max_memory / 1000)
 
 mcfs = [mc.fcisolver]
@@ -84,6 +84,13 @@ mc.canonicalization = True
 mc.natorb = True
 
 mcfs = [mcl.fcisolver, mch.fcisolver]
+"""
+
+DRYRUN_FINAL = """
+for mcf in mcfs:
+    mcf.conv_tol = %s
+from pyscf import dmrgscf
+dmrgscf.dryrun(mc)
 """
 
 CASCI_FINAL = """
@@ -151,14 +158,40 @@ def write(fn, pmc, pmf, is_casci=True):
             pmc["frac_occ_tol"],
             "CASCI" if is_casci else "CASSCF",
             pmc["conv_tol"],
-            pmc["max_cycle"])
-        )
+            pmc["max_cycle"],
+            "False" if "no_canonicalize" in pmc else "True",
+            "False" if "no_canonicalize" in pmc else "True"
+        ))
 
         if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
             f.write(DMRG % (
                 "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
                 pmc["maxm"], pmc["fci_conv_tol"]))
-        
+
+        if "dmrg-sch-sweeps" in pmc:
+            f.write("for mcf in mcfs:\n")
+            f.write("    mcf.scheduleSweeps = %s\n" % list(map(int, pmc["dmrg-sch-sweeps"].split(";"))))
+            assert len(pmc["dmrg-sch-maxms"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+            f.write("    mcf.scheduleMaxMs = %s\n" % list(map(int, pmc["dmrg-sch-maxms"].split(";"))))
+            if ";" in pmc["dmrg-sch-tols"]:
+                assert len(pmc["dmrg-sch-tols"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+                f.write("    mcf.scheduleTols = %s\n" % list(map(float, pmc["dmrg-sch-tols"].split(";"))))
+            else:
+                f.write("    mcf.scheduleTols = %s\n" % ([float(pmc["dmrg-sch-tols"])] * len(pmc["dmrg-sch-sweeps"].split(";"))))
+            if ";" in pmc["dmrg-sch-noises"]:
+                assert len(pmc["dmrg-sch-noises"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+                f.write("    mcf.scheduleNoises = %s\n" % list(map(float, pmc["dmrg-sch-noises"].split(";"))))
+            else:
+                f.write("    mcf.scheduleNoises = %s\n" % ([float(pmc["dmrg-sch-noises"])] * len(pmc["dmrg-sch-sweeps"].split(";"))))
+            f.write("    mcf.maxIter = %s\n" % pmc["dmrg-max-iter"])
+            f.write("    mcf.twodot_to_onedot = %s\n" % pmc["dmrg-tto"])
+            if "dmrg-tol" in pmc:
+                f.write("    mcf.tol = %s\n" % pmc["dmrg-tol"])
+            if "dmrg-no-2pdm" in pmc:
+                f.write("    mcf.twopdm = False\n")
+            if "dmrg-1pdm" in pmc:
+                f.write("    mcf.block_extra_keyword = ['%s']\n" % "onepdm")
+
         if "mixspin" in pmc:
             f.write(CASSCF_MIXSPIN)
 
@@ -168,12 +201,40 @@ def write(fn, pmc, pmf, is_casci=True):
         if "ci_response_space" in pmc:
             f.write("mc.ci_response_space = %s\n" % pmc["ci_response_space"])
 
-        f.write(CASCI_FINAL % (
-            pmc["fci_conv_tol"],
-            "kernel" if is_casci else "mc2step",
-            pmc["nrepeat"],
-            "kernel" if is_casci else "mc2step")
-        )
+        if "dryrun" in pmc:
+            f.write(DRYRUN_FINAL % pmc["fci_conv_tol"])
 
-        f.write(ALL_FINAL)
+            if "dmrg-rev-sweeps" in pmc:
+                f.write("for mcf in mcfs:\n")
+                f.write("    mcf.scheduleSweeps = %s\n" % list(map(int, pmc["dmrg-rev-sweeps"].split(";"))))
+                assert len(pmc["dmrg-rev-maxms"].split(";")) == len(pmc["dmrg-rev-sweeps"].split(";"))
+                f.write("    mcf.scheduleMaxMs = %s\n" % list(map(int, pmc["dmrg-rev-maxms"].split(";"))))
+                if ";" in pmc["dmrg-rev-tols"]:
+                    assert len(pmc["dmrg-rev-tols"].split(";")) == len(pmc["dmrg-rev-sweeps"].split(";"))
+                    f.write("    mcf.scheduleTols = %s\n" % list(map(float, pmc["dmrg-rev-tols"].split(";"))))
+                else:
+                    f.write("    mcf.scheduleTols = %s\n" % ([float(pmc["dmrg-rev-tols"])] * len(pmc["dmrg-rev-sweeps"].split(";"))))
+                if ";" in pmc["dmrg-rev-noises"]:
+                    assert len(pmc["dmrg-rev-noises"].split(";")) == len(pmc["dmrg-rev-sweeps"].split(";"))
+                    f.write("    mcf.scheduleNoises = %s\n" % list(map(float, pmc["dmrg-rev-noises"].split(";"))))
+                else:
+                    f.write("    mcf.scheduleNoises = %s\n" % ([float(pmc["dmrg-rev-noises"])] * len(pmc["dmrg-rev-sweeps"].split(";"))))
+                f.write("    mcf.maxIter = %s\n" % pmc["dmrg-rev-iter"])
+                f.write("    mcf.twodot_to_onedot = 0\n")
+                f.write("    mcf.tol = 0.0\n")
+                f.write("    mcf.twopdm = False\n")
+                f.write("    mcf.block_extra_keyword = ['fullrestart', 'twodot', 'extrapolation']\n")
+                f.write("    mcf.configFile = \"dmrg-rev.conf\"\n")
+
+                f.write(DRYRUN_FINAL % pmc["fci_conv_tol"])
+
+        else:
+            f.write(CASCI_FINAL % (
+                pmc["fci_conv_tol"],
+                "kernel" if is_casci else "mc2step",
+                pmc["nrepeat"],
+                "kernel" if is_casci else "mc2step")
+            )
+            f.write(ALL_FINAL)
+
         f.write(TIME_ED)

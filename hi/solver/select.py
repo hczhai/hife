@@ -28,6 +28,13 @@ else:
     fav = mo_coeff @ np.diag(mo_energy) @ mo_coeff.T
 
 ova = mol.intor_symmetric('cint1e_ovlp_sph')
+nactorb = None
+nactelec = None
+split_low = 0.0
+split_high = 0.0
+alpha = False
+beta = False
+uno = False
 """
 
 SELECT = """
@@ -41,11 +48,66 @@ for fname in ["mo_coeff.npy", "lo_coeff.npy", "nat_coeff.npy"]:
         coeff = np.load(lde + "/" + fname)
         break
 
-for fname in ["mf_occ.npy", "lo_occ.npy", "nat_coeff.npy"]:
+for fname in ["mf_occ.npy", "lo_occ.npy", "nat_occ.npy"]:
     if os.path.isfile(lde + "/" + fname):
         print("use: " + lde + "/" + fname)
         mo_occ = np.load(lde + "/" + fname)
         break
+
+if alpha:
+    coeff = coeff[0]
+    mo_occ = mo_occ[0]
+elif beta:
+    coeff = coeff[1]
+    mo_occ = mo_occ[1]
+elif uno:
+    # 1. Read UHF-alpha/beta orbitals from chkfile
+    ma, mb = coeff
+    norb = ma.shape[1]
+    nalpha = (mol.nelectron + mol.spin) // 2
+    nbeta  = (mol.nelectron - mol.spin) // 2
+    print('Nalpha = %d, Nbeta %d, Sz = %d, Norb = %d' % (nalpha, nbeta, mol.spin, norb))
+
+    # 2. Sanity check, using orthogonality
+
+    ova = mol.intor_symmetric("cint1e_ovlp_sph")
+    diff = ma.T @ ova @ ma - np.identity(norb)
+    assert np.linalg.norm(diff) < 1E-7
+    diff = mb.T @ ova @ mb - np.identity(norb)
+    assert np.linalg.norm(diff) < 1E-7
+
+    print('alpha occ = ', mo_occ[0])
+    print('beta  occ = ', mo_occ[1])
+
+    pTa = ma @ np.diag(mo_occ[0]) @ ma.T
+    pTb = mb @ np.diag(mo_occ[1]) @ mb.T
+    pT = 0.5 * (pTa + pTb)
+
+    # Lowdin basis
+    s12 = sqrtm(ova)
+    s12inv = lowdin(ova)
+    pT = s12 @ pT @ s12
+    print('Idemponency of DM: %s' % np.linalg.norm(pT.dot(pT) - pT))
+
+    # 'natural' occupations and orbitals
+    mo_occ, coeff = np.linalg.eigh(pT)
+    mo_occ = 2 * mo_occ
+    mo_occ[abs(mo_occ) < 1E-14] = 0.0
+
+    # Rotate back to AO representation and check orthogonality
+    coeff = np.dot(s12inv, coeff)
+    diff = coeff.T @ ova @ coeff - np.identity(norb)
+    assert np.linalg.norm(diff) < 1E-7
+
+    index = np.argsort(-mo_occ)
+    mo_occ  = mo_occ[index]
+    coeff = coeff[:, index]
+
+    np.save("lo_coeff.npy", coeff)
+    np.save("lo_occ.npy", mo_occ)
+"""
+
+SELECT2 = """
 
 def psort(ova, fav, pT, coeff):
    pTnew = 2.0 * (coeff.T @ ova @ pT @ ova @ coeff)
@@ -57,14 +119,56 @@ def psort(ova, fav, pT, coeff):
    enorb = enorb[index]
    return ncoeff, nocc, enorb
 
-actmo = coeff[:, np.array(cas_list, dtype=int)]
-if do_loc:
-    ierr, ua = loc(mol, actmo)
-    actmo = actmo.dot(ua)
-actmo, n_o, e_o = psort(ova, fav, pav, actmo)
+if cas_list is None:
+    assert nactorb is not None
+    assert nactelec is not None
+    ncore = (mol.nelectron - nactelec) // 2
+    cas_list = list(range(ncore, ncore + nactorb))
+
+print('cas list = ', cas_list)
+
+if split_low == 0.0 and split_high == 0.0:
+
+    print('simple localization')
+
+    actmo = coeff[:, np.array(cas_list, dtype=int)]
+    if do_loc:
+        ierr, ua = loc(mol, actmo)
+        actmo = actmo.dot(ua)
+    actmo, actocc, e_o = psort(ova, fav, pav, actmo)
+
+else:
+
+    print('split localization at', split_low, '~', split_high)
+    assert do_loc
+    assert split_high >= split_low
+    actmo = coeff[:, np.array(cas_list, dtype=int)]
+    actocc = mo_occ[np.array(cas_list, dtype=int)]
+    print('active occ = ', np.sum(actocc, axis=-1), actocc)
+    lidx = actocc <= split_low
+    midx = (actocc > split_low) & (actocc <= split_high)
+    hidx = actocc > split_high
+
+    if len(actmo[:, lidx]) != 0:
+        print('low orbs = ', np.array(list(range(len(lidx))))[lidx])
+        ierr, ua = loc(mol, actmo[:, lidx])
+        actmo[:, lidx] = actmo[:, lidx].dot(ua)
+        actmo[:, lidx], actocc[lidx], _ = psort(ova, fav, pav, actmo[:, lidx])
+
+    if len(actmo[:, midx]) != 0:
+        print('mid orbs = ', np.array(list(range(len(midx))))[midx])
+        ierr, ua = loc(mol, actmo[:, midx])
+        actmo[:, midx] = actmo[:, midx].dot(ua)
+        actmo[:, midx], actocc[midx], _ = psort(ova, fav, pav, actmo[:, midx])
+
+    if len(actmo[:, hidx]) != 0:
+        print('high orbs = ', np.array(list(range(len(hidx))))[hidx])
+        ierr, ua = loc(mol, actmo[:, hidx])
+        actmo[:, hidx] = actmo[:, hidx].dot(ua)
+        actmo[:, hidx], actocc[hidx], _ = psort(ova, fav, pav, actmo[:, hidx])
 
 coeff[:, np.array(sorted(cas_list), dtype=int)] = actmo
-mo_occ[np.array(sorted(cas_list), dtype=int)] = n_o
+mo_occ[np.array(sorted(cas_list), dtype=int)] = actocc
 
 # sort_mo from pyscf.mcscf.addons
 
@@ -101,9 +205,38 @@ def write(fn, pma):
             lde = "../" + lde
 
         f.write("lde = '%s'\n" % lde)
-        f.write("cas_list = %s\n" % pma["cas_list"])
+        if "cas_list" in pma:
+            f.write("cas_list = %s\n" % pma["cas_list"])
+        else:
+            f.write("cas_list = None\n")
+
+        if "nactorb" in pma:
+            f.write("nactorb = %s\n" % pma["nactorb"])
+
+        if "nactelec" in pma:
+            f.write("nactelec = %s\n" % pma["nactelec"])
+
+        if "split_low" in pma:
+            f.write("split_low = %s\n" % pma["split_low"])
+
+        if "split_high" in pma:
+            f.write("split_high = %s\n" % pma["split_high"])
+
+        if "alpha" in pma:
+            f.write("alpha = True\n")
+
+        if "beta" in pma:
+            f.write("beta = True\n")
+
+        if "uno" in pma:
+            f.write("uno = True\n")
+
         f.write("do_loc = %s\n" % (False if "no_loc" in pma else True))
 
         f.write(PM_LOC)
         f.write(SELECT)
+
+        if "uno" not in pma or "nactorb" in pma or "nactelec" in pma or "cas_list" in pma:
+            f.write(SELECT2)
+
         f.write(TIME_ED)

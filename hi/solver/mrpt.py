@@ -10,6 +10,7 @@ x2c = %s
 nactorb = None
 nactelec = None
 spin = None
+fix_spin = False
 """
 
 CASCI = """
@@ -50,6 +51,9 @@ mf.chkfile = "mf.chk"
 mf.mo_coeff = coeff
 
 mc = mcscf.CASCI(mf, nactorb, (nacta, nactb))
+if fix_spin:
+    from pyscf import fci
+    mc.fcisolver = fci.addons.fix_spin(mc.fcisolver, 0.2, spin * (spin + 2) / 4.0)
 mc.fcisolver.conv_tol = %s
 mc.canonicalization = True
 mc.natorb = True
@@ -69,6 +73,44 @@ ic = ICNEVPT2(mc).run()
 ICMRREPT2 = """
 from pyblock2.icmr.icmrrept2_full import ICMRREPT2
 ic = ICMRREPT2(mc).run()
+"""
+
+ICMRLCC = """
+from pyscf import lib, fci
+mc.fcisolver.scratchDirectory = lib.param.TMPDIR
+mc.fcisolver.memory = int(mol.max_memory / 1000)
+def make_rdm4(**kwargs):
+    dms = fci.rdm.make_dm1234('FCI4pdm_kern_sf', mc.ci, mc.ci, mc.ncas, mc.nelecas)
+    E1, E2, E3, E4 = [np.zeros_like(dm) for dm in dms]
+    deltaAA = np.eye(mc.ncas)
+    E1 += np.einsum('pa->pa', dms[0], optimize=True)
+    E2 += np.einsum('paqb->pqab', dms[1], optimize=True)
+    E2 += -1 * np.einsum('aq,pb->pqab', deltaAA, E1, optimize=True)
+    E3 += np.einsum('paqbgc->pqgabc', dms[2], optimize=True)
+    E3 += -1 * np.einsum('ag,pqcb->pqgabc', deltaAA, E2, optimize=True)
+    E3 += -1 * np.einsum('aq,pgbc->pqgabc', deltaAA, E2, optimize=True)
+    E3 += -1 * np.einsum('bg,pqac->pqgabc', deltaAA, E2, optimize=True)
+    E3 += -1 * np.einsum('aq,bg,pc->pqgabc', deltaAA, deltaAA, E1, optimize=True)
+    E4 += np.einsum('aebfcgdh->abcdefgh', dms[3], optimize=True)
+    E4 += -1 * np.einsum('eb,acdfgh->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('ec,abdgfh->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('ed,abchfg->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('fc,abdegh->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('fd,abcehg->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('gd,abcefh->abcdefgh', deltaAA, E3, optimize=True)
+    E4 += -1 * np.einsum('eb,fc,adgh->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('eb,fd,achg->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('eb,gd,acfh->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('ec,fd,abgh->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('ec,gd,abhf->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('ed,fc,abhg->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('fc,gd,abeh->abcdefgh', deltaAA, deltaAA, E2, optimize=True)
+    E4 += -1 * np.einsum('eb,fc,gd,ah->abcdefgh', deltaAA, deltaAA, deltaAA, E1, optimize=True)
+    return E4
+mc.fcisolver.make_rdm4 = make_rdm4
+from pyscf.icmpspt import icmpspt
+e_corr = icmpspt.mrlcc(mc, nfro=0)
+lib.logger.note(mc, 'E(ICMRLCC) = %.16g  E_corr_pt = %.16g', mc.e_tot + e_corr, e_corr)
 """
 
 SCNEVPT2_B2 = """
@@ -103,6 +145,9 @@ def write(fn, pmc, pmf):
             f.write("spin = %s\n" % pmc["spin"])
         else:
             f.write("spin = None\n")
+        
+        if "fix_spin" in pmc:
+            f.write("fix_spin = True\n")
 
         f.write(CASCI % (
             pmc["frac_occ_tol"],
@@ -118,6 +163,8 @@ def write(fn, pmc, pmf):
             f.write(ICNEVPT2)
         elif pmc["method"] == "ic-mrrept2":
             f.write(ICMRREPT2)
+        elif pmc["method"] == "ic-mrlcc":
+            f.write(ICMRLCC)
         else:
             raise RuntimeError("Unknown mrpt method: %s" % pmc["method"])
 

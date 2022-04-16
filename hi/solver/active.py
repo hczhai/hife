@@ -163,7 +163,7 @@ nalpha = (mol.nelectron + mol.spin) // 2
 nbeta  = (mol.nelectron - mol.spin) // 2
 print('Nalpha = %d, Nbeta %d, Sz = %d, Norb = %d' % (nalpha, nbeta, mol.spin, norb))
 
-# 2. Sanity check, using eg orthogonality
+# 2. Sanity check, using orthogonality
 
 ova = mol.intor_symmetric("cint1e_ovlp_sph")
 diff = ma.T @ ova @ ma - np.identity(norb)
