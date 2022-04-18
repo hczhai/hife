@@ -98,7 +98,7 @@ class CCSolver:
 
     def make_rdm1(self, t12, norb, nelec):
         dms = self.cc.make_rdm1(**t12)
-        if isintance(dms, tuple):
+        if isinstance(dms, tuple):
             return dms[0] + dms[1]
         else:
             return dms
