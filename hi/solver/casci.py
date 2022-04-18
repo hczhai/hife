@@ -69,6 +69,44 @@ mc.fcisolver.memory = int(mol.max_memory / 1000)
 mcfs = [mc.fcisolver]
 """
 
+CASCC = """
+import numpy as np
+from pyscf import cc, gto
+
+class CCSolver:
+    def kernel(self, h1, h2, norb, nelec, ci0=None, ecore=0, **kwargs):
+        mol = gto.M(verbose=4)
+        mol.nelectron = sum(nelec)
+        mol.spin = nelec[0] - nelec[1]
+        mf = mol.RHF()
+        mf._eri = h2
+        mf.get_hcore = lambda *args: h1
+        mf.get_ovlp = lambda *args: np.identity(norb)
+        if mol.spin == 0:
+            mf.mo_coeff = np.identity(norb)
+            mf.mo_occ = np.zeros(norb)
+            mf.mo_occ[:nelec[0]] += 1.0
+            mf.mo_occ[:nelec[1]] += 1.0
+        else:
+            mf.mo_coeff = np.identity(norb)
+            mf.mo_coeff = np.array([mf.mo_coeff, mf.mo_coeff])
+            mf.mo_occ = np.zeros((2, norb))
+            mf.mo_occ[0][:nelec[0]] += 1.0
+            mf.mo_occ[1][:nelec[1]] += 1.0
+        self.cc = cc.CCSD(mf).run()
+        return self.cc.e_tot + ecore, dict(t1=self.cc.t1, t2=self.cc.t2)
+
+    def make_rdm1(self, t12, norb, nelec):
+        dms = self.cc.make_rdm1(**t12)
+        if isintance(dms, tuple):
+            return dms[0] + dms[1]
+        else:
+            return dms
+
+mc.fcisolver = CCSolver()
+mcfs = [mc.fcisolver]
+"""
+
 CASSCF_MIXSPIN = """
 from pyscf import fci
 mch = mc
@@ -163,6 +201,9 @@ def write(fn, pmc, pmf, is_casci=True):
             "False" if "no_canonicalize" in pmc else "True"
         ))
 
+        if "cascc" in pmc:
+            f.write(CASCC)
+
         if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
             f.write(DMRG % (
                 "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
@@ -225,6 +266,23 @@ def write(fn, pmc, pmf, is_casci=True):
                 f.write("    mcf.twopdm = False\n")
                 f.write("    mcf.block_extra_keyword = ['fullrestart', 'twodot', 'extrapolation']\n")
                 f.write("    mcf.configFile = \"dmrg-rev.conf\"\n")
+
+                f.write(DRYRUN_FINAL % pmc["fci_conv_tol"])
+            
+            if "dmrg-csf" in pmc:
+                f.write("for mcf in mcfs:\n")
+                f.write("    mcf.scheduleSweeps = [0]\n")
+                f.write("    mcf.scheduleMaxMs = [%s]\n" % pmc["maxm"])
+                f.write("    mcf.scheduleTols = [5E-6]\n")
+                f.write("    mcf.scheduleNoises = [0.0]\n")
+                f.write("    mcf.maxIter = 1\n")
+                f.write("    mcf.twodot_to_onedot = 0\n")
+                f.write("    mcf.tol = 0.0\n")
+                f.write("    mcf.twopdm = False\n")
+                f.write("    mcf.block_extra_keyword = ['trans_mps_to_singlet_embedding']\n")
+                f.write("    mcf.block_extra_keyword += ['restart_copy_mps SEKET']\n")
+                f.write("    mcf.block_extra_keyword += ['restart_sample %s']\n" % pmc["dmrg-csf"])
+                f.write("    mcf.configFile = \"dmrg-csf.conf\"\n")
 
                 f.write(DRYRUN_FINAL % pmc["fci_conv_tol"])
 

@@ -386,7 +386,8 @@ class HFDriver(BaseDriver):
             "no_canonicalize", "dryrun", "dmrg-sch-sweeps", "dmrg-sch-maxms",
             "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
             "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
-            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter" ] + list(opts.keys())
+            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
+            "cascc" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -526,6 +527,9 @@ class HFDriver(BaseDriver):
             ropts["@RESTART"] = "1"
             ropts["@NAME"] = opts["name"].replace("hife", "drev")
             optcopy(self.scripts_render.get("run.sh"), "%s/block2-dmrg-rev.sh" % xdir, ropts)
+            ropts["@NAME"] = opts["name"].replace("hife", "dcsf")
+            optcopy(self.scripts_render.get("run.sh").replace("dmrg-rev", "dmrg-csf"),
+                "%s/block2-dmrg-csf.sh" % xdir, ropts)
 
     def ex(self, args):
         """Execute job scripts on this node."""
@@ -548,7 +552,8 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude", "restart", "block2-dmrg", "block2-dmrg-rev" ] + list(opts.keys())
+        optl = [ "exclude", "restart",
+            "block2-dmrg", "block2-dmrg-rev", "block2-dmrg-csf" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
         os.chdir('%s/runs/%s' % (lr[0], sec_key))
@@ -556,6 +561,8 @@ class HFDriver(BaseDriver):
             l = "block2-dmrg.sh"
         elif "block2-dmrg-rev" in opts:
             l = "block2-dmrg-rev.sh"
+        elif "block2-dmrg-csf" in opts:
+            l = "block2-dmrg-csf.sh"
         elif "restart" in opts:
             l = "restart.sh"
         else:
