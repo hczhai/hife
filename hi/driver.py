@@ -22,6 +22,7 @@ def get_host():
 
 host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24, 'cori': 32 }
 host_part = {'pauling': 'serial,parallel', 'hpc': '', 'mac': '', 'cori': '' }
+host_def_queue = {'pauling': 'normal', 'cori': 'regular', 'hpc': 'normal', 'mac': ''}
 extra_basis = { 'def2-sv(p)': 'def2-svpp.dat' }
 
 def time_span_str(time, no_sec=False):
@@ -387,7 +388,7 @@ class HFDriver(BaseDriver):
             "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
             "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
             "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
-            "cascc" ] + list(opts.keys())
+            "cas_ccsd", "cas_ccsd_t" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -450,7 +451,7 @@ class HFDriver(BaseDriver):
             "name": "%s.%s.hife" % (pre["create"]["name"][:3], args[1]),
             "mem": pre["hosts"]["mem"],
             "partition": pre["hosts"]["partition"],
-            "queue": "regular"
+            "queue": host_def_queue[pre["hosts"]["name"]]
         }
         optl = [] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
@@ -712,6 +713,14 @@ class HFDriver(BaseDriver):
                     xx += " solver = %s" % v["solver"]
                 if "spin" in v:
                     xx += " spin = %s" % v["spin"]
+                if "maxm" in v:
+                    xx += " maxm = %s" % v["maxm"]
+                if "block2-dmrg" in v:
+                    xx += " b2-dmrg"
+                if "cas_ccsd" in v:
+                    xx += " cas_ccsd"
+                if "cas_ccsd_t" in v:
+                    xx += " cas_ccsd(t)"
                 print("%s%s" % (xx, extra))
             if k.startswith("orb-"):
                 print("   PLOT --- cd %s/runs/%s; jmol orbs.spt; cd -" % (lr[0], k))

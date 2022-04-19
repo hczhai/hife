@@ -74,6 +74,9 @@ import numpy as np
 from pyscf import cc, gto
 
 class CCSolver:
+    def __init__(self, ccsd_t=False):
+        self.ccsd_t = ccsd_t
+
     def kernel(self, h1, h2, norb, nelec, ci0=None, ecore=0, **kwargs):
         mol = gto.M(verbose=4)
         mol.nelectron = sum(nelec)
@@ -94,7 +97,11 @@ class CCSolver:
             mf.mo_occ[0][:nelec[0]] += 1.0
             mf.mo_occ[1][:nelec[1]] += 1.0
         self.cc = cc.CCSD(mf).run()
-        return self.cc.e_tot + ecore, dict(t1=self.cc.t1, t2=self.cc.t2)
+        if self.ccsd_t:
+            e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
+        else:
+            e_ccsd_t = self.cc.e_tot
+        return e_ccsd_t + ecore, dict(t1=self.cc.t1, t2=self.cc.t2)
 
     def make_rdm1(self, t12, norb, nelec):
         dms = self.cc.make_rdm1(**t12)
@@ -103,7 +110,7 @@ class CCSolver:
         else:
             return dms
 
-mc.fcisolver = CCSolver()
+mc.fcisolver = CCSolver(ccsd_t=%s)
 mcfs = [mc.fcisolver]
 """
 
@@ -201,8 +208,11 @@ def write(fn, pmc, pmf, is_casci=True):
             "False" if "no_canonicalize" in pmc else "True"
         ))
 
-        if "cascc" in pmc:
-            f.write(CASCC)
+        if "cas_ccsd" in pmc:
+            f.write(CASCC % (False, ))
+
+        if "cas_ccsd_t" in pmc:
+            f.write(CASCC % (True, ))
 
         if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
             f.write(DMRG % (

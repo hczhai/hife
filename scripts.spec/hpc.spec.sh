@@ -2,6 +2,7 @@
 ### start:deriv.main
 #SBATCH --job-name @NAME
 #SBATCH -o LOG.%j
+#SBATCH -q @QUEUE
 #SBATCH --nodes=@NNODES
 #SBATCH --time=@TIME
 #SBATCH --ntasks-per-node=1
