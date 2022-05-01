@@ -17,6 +17,7 @@ mf.mo_occ = mfx["mo_occ"]
 
 do_ccsd_t = True
 bcc = False
+do_spin_square = False
 """
 
 CC_LOAD_COEFF = """
@@ -91,6 +92,11 @@ e_ccsd = mc.e_tot
 print('ECCSD    = ', e_ccsd)
 print("PART TIME (CCSD) = %20.3f" % (time.perf_counter() - txst))
 
+if do_spin_square:
+    S2 = mc.spin_square()[0]
+    print('CCSD <S^2> = ', S2)
+    print("PART TIME (CCSD S2) = %20.3f" % (time.perf_counter() - txst))
+
 if bcc:
     from libdmet.solver.cc import bcc_loop
     mc = bcc_loop(mc, utol=bcc_conv_tol, max_cycle=bcc_max_cycle, verbose=mol.verbose)
@@ -98,10 +104,49 @@ if bcc:
     print('EBCCSD   = ', e_bccsd)
     print("PART TIME (BCCSD) = %20.3f" % (time.perf_counter() - txst))
 
+    if do_spin_square:
+        S2 = mc.spin_square()[0]
+        print('BCCSD <S^2> = ', S2)
+        print("PART TIME (BCCSD S2) = %20.3f" % (time.perf_counter() - txst))
+
 if do_ccsd_t:
-    e_ccsd_t = mc.e_tot + mc.ccsd_t()
+    eris = mc.ao2mo()
+    e_ccsd_t = mc.e_tot + mc.ccsd_t(eris=eris)
     print('ECCSD(T) = ', e_ccsd_t)
     print("PART TIME (CCSD(T))  = %20.3f" % (time.perf_counter() - txst))
+
+    if do_spin_square:
+        from pyscf.cc import uccsd_t_lambda, uccsd_t_rdm
+        from pyscf.fci import spin_op
+        conv, l1, l2 = uccsd_t_lambda.kernel(mc, tol=1E-7)
+        print("PART TIME (CCSD(T) Lambda) = %20.3f" % (time.perf_counter() - txst))
+        assert conv
+        dm1 = uccsd_t_rdm.make_rdm1(mc, t1, t2, l1, l2, eris)
+        print("PART TIME (CCSD(T) RDM1) = %20.3f" % (time.perf_counter() - txst))
+
+        import numpy as np
+        if dm1[0].ndim == 2:
+            mc_occ_t = np.diag(dm1[0]) + np.diag(dm1[1])
+        else:
+            mc_occ_t = np.diag(dm1)
+
+        np.save("cc_t_occ.npy", mc_occ_t)
+        np.save("cc_t_mo_coeff.npy", mc.mo_coeff)
+        np.save("cc_t_e_tot.npy", e_ccsd_t)
+        np.save("cc_t_dmmo.npy", dm1)
+
+        nat_occ_t, u_t = np.linalg.eigh(dm1)
+        nat_coeff_t = np.einsum('...pi,...ij->...pj', mc.mo_coeff, u_t, optimize=True)
+        np.save("cc_t_nat_coeff.npy", nat_coeff_t[..., ::-1])
+        np.save("cc_t_nat_occ.npy", nat_coeff_t[..., ::-1])
+
+        print('ccsd(t) nat occ', np.sum(nat_occ_t, axis=-1), nat_occ_t)
+
+        dm2 = uccsd_t_rdm.make_rdm2(mc, t1, t2, l1, l2, eris)
+        print("PART TIME (CCSD(T) RDM2) = %20.3f" % (time.perf_counter() - txst))
+        S2 = spin_op.spin_square_general(*dm1, *dm2, mc.mo_coeff, mc._scf.get_ovlp())[0]
+        print('CCSD(T) <S^2> = ', S2)
+        print("PART TIME (CCSD(T) S2) = %20.3f" % (time.perf_counter() - txst))
 
 mc.diis_file = lib.param.TMPDIR + '/ccdiis-lambda.h5'
 if is_restart and os.path.isfile(lib.param.TMPDIR + '/ccdiis-lambda.h5'):
@@ -176,6 +221,9 @@ def write(fn, pmc, pmf):
 
         if "no_ccsd_t" in pmc:
             f.write("do_ccsd_t = False\n")
+
+        if "do_spin_square" in pmc:
+            f.write("do_spin_square = True\n")
 
         if "KS" in mme:
             if "U" in mme:
