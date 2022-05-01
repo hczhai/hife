@@ -454,7 +454,8 @@ class HFDriver(BaseDriver):
             "mem": pre["hosts"]["mem"],
             "partition": pre["hosts"]["partition"],
             "queue": host_def_queue[pre["hosts"]["name"]],
-            "arch": "haswell"
+            "arch": "haswell",
+            "tmin": ""
         }
         optl = [] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
@@ -519,7 +520,8 @@ class HFDriver(BaseDriver):
             "@RESTART": "0",
             "@BLOCK2": "0",
             "@QUEUE": opts["queue"],
-            "@ARCH": opts["arch"]
+            "@ARCH": opts["arch"],
+            "@TMIN": opts["tmin"] if opts["tmin"] != "" else opts["time"]
         }
         optcopy(self.scripts_render.get("run.sh"), "%s/run.sh" % xdir, ropts)
         ropts["@RESTART"] = "1"

@@ -6,6 +6,7 @@
 #SBATCH -q @QUEUE
 #SBATCH --nodes=@NNODES
 #SBATCH --time=@TIME
+#SBATCH --time-min=@TMIN
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=@NCORES
 #SBATCH --no-requeue
