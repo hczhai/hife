@@ -91,17 +91,17 @@ e_ccsd = mc.e_tot
 print('ECCSD    = ', e_ccsd)
 print("PART TIME (CCSD) = %20.3f" % (time.perf_counter() - txst))
 
-if do_ccsd_t:
-    e_ccsd_t = e_ccsd + mc.ccsd_t()
-    print('ECCSD(T) = ', e_ccsd_t)
-    print("PART TIME (CCSD(T))  = %20.3f" % (time.perf_counter() - txst))
-
 if bcc:
     from libdmet.solver.cc import bcc_loop
     mc = bcc_loop(mc, utol=bcc_conv_tol, max_cycle=bcc_max_cycle, verbose=mol.verbose)
     e_bccsd = mc.e_tot
     print('EBCCSD   = ', e_bccsd)
     print("PART TIME (BCCSD) = %20.3f" % (time.perf_counter() - txst))
+
+if do_ccsd_t:
+    e_ccsd_t = mc.e_tot + mc.ccsd_t()
+    print('ECCSD(T) = ', e_ccsd_t)
+    print("PART TIME (CCSD(T))  = %20.3f" % (time.perf_counter() - txst))
 
 mc.diis_file = lib.param.TMPDIR + '/ccdiis-lambda.h5'
 if is_restart and os.path.isfile(lib.param.TMPDIR + '/ccdiis-lambda.h5'):

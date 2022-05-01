@@ -2,7 +2,7 @@
 ### start:deriv.main
 #SBATCH --job-name @NAME
 #SBATCH -o LOG.%j
-#SBATCH -C haswell
+#SBATCH -C @ARCH
 #SBATCH -q @QUEUE
 #SBATCH --nodes=@NNODES
 #SBATCH --time=@TIME

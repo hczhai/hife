@@ -7,6 +7,45 @@ mf.chkfile = 'mf.chk'
 mf.conv_tol = %s
 """
 
+MF_DIMER_INIT = """
+spin_bak = mol.spin
+mol.spin = 0
+mol.build()
+
+import numpy as np
+
+rmf = scf.RHF(mol)
+dm0 = rmf.get_init_guess(key="atom")
+dm0 = np.array([dm0, dm0]) * 0.5
+idx0 = mol.search_ao_label("0 %s.*")
+idx1 = mol.search_ao_label("1 %s.*")
+
+from pyscf import lo
+from libdmet.basis_transform import make_basis
+
+ld = lo.orth_ao(mol, 'lowdin', pre_orth_ao='SCF')
+dl0 = make_basis.transform_rdm1_to_lo_mol(dm0, ld, rmf.get_ovlp())
+
+dspin = float(%s)
+afm = %s
+
+if afm:
+    dl0[0][idx0, idx0] += dspin / len(idx0)
+    dl0[0][idx1, idx1] -= dspin / len(idx1)
+    dl0[1][idx0, idx0] -= dspin / len(idx0)
+    dl0[1][idx1, idx1] += dspin / len(idx1)
+else:
+    dl0[0][idx0, idx0] += dspin / len(idx0)
+    dl0[0][idx1, idx1] += dspin / len(idx1)
+    dl0[1][idx0, idx0] -= dspin / len(idx0)
+    dl0[1][idx1, idx1] -= dspin / len(idx1)
+
+dm = make_basis.transform_rdm1_to_ao_mol(dl0, ld)
+
+mol.spin = spin_bak
+mol.build()
+"""
+
 MF_SMEAR = """
 mf = %s
 mf = pbc_helper.smearing_(mf, sigma=%s, method='fermi', fit_spin=True)
@@ -67,6 +106,14 @@ def write(fn, pmf):
         mme = xmethod(pmf["method"], "x2c" in pmf)
         f.write("dm = None\n")
 
+        if "dimer_init" in pmf:
+            f.write(MF_DIMER_INIT % (
+                pmf["dimer_init"], pmf["dimer_init"],
+                pmf["dimer_spin"], pmf["dimer_type"].lower() == "afm"
+            ))
+        else:
+            f.write("dm = None\n")
+
         if "smearing" in pmf:
             f.write("from libdmet.routine import pbc_helper\n")
             sigmas = pmf["smearing"].split(";")
@@ -94,11 +141,16 @@ def write(fn, pmf):
             f.write("mf.xc = '%s'\n" % pmf["func"])
         if "max_cycle" in pmf:
             f.write("mf.max_cycle = %s\n" % pmf["max_cycle"])
+        
+        if "direct_newton" in pmf:
+            f.write("mf = mf.newton()\n")
         f.write(MF_FINAL)
 
         if "newton_conv" in pmf:
             f.write("mf = mf.newton()\n")
             f.write("mf.conv_tol = %s\n" % pmf["newton_conv"])
+            if "newton_max_cycle" in pmf:
+                f.write("mf.max_cycle = %s\n" % pmf["newton_max_cycle"])
             f.write(MF_FINAL)
 
         f.write(ALL_FINAL)

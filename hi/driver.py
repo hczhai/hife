@@ -211,7 +211,9 @@ class HFDriver(BaseDriver):
             "conv_tol": "1E-12"
         }
         optl = [ "smearing", "smearing_conv_tol", "x2c",
-            "smearing_method", "smearing_max_cycle" ] + list(opts.keys())
+            "smearing_method", "smearing_max_cycle", "newton_max_cycle",
+            "dimer_init", "dimer_spin", "dimer_type", "direct_newton",
+            "newton_conv" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage" ]:
             if k not in opts:
@@ -451,7 +453,8 @@ class HFDriver(BaseDriver):
             "name": "%s.%s.hife" % (pre["create"]["name"][:3], args[1]),
             "mem": pre["hosts"]["mem"],
             "partition": pre["hosts"]["partition"],
-            "queue": host_def_queue[pre["hosts"]["name"]]
+            "queue": host_def_queue[pre["hosts"]["name"]],
+            "arch": "haswell"
         }
         optl = [] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
@@ -515,7 +518,8 @@ class HFDriver(BaseDriver):
             "@TMPDIR": rdir,
             "@RESTART": "0",
             "@BLOCK2": "0",
-            "@QUEUE": opts["queue"]
+            "@QUEUE": opts["queue"],
+            "@ARCH": opts["arch"]
         }
         optcopy(self.scripts_render.get("run.sh"), "%s/run.sh" % xdir, ropts)
         ropts["@RESTART"] = "1"
@@ -638,6 +642,8 @@ class HFDriver(BaseDriver):
                             extra += " nelec = %d" % sum([int(x) for x in xgl.split('=')[-1].strip()[1:-1].split(', ')])
                         elif "converged SCF energy" in xgl:
                             ex = xgl.split("=")[1].split()[0]
+                            if "<S^2> = " in xgl:
+                                ssq = xgl.split("<S^2> = ")[-1].split()[0]
                         elif "SCF not converged" in xgl:
                             ex = "!!! NO CONV !!!"
                         elif ex == "!!! NO CONV !!!" and "SCF energy" in xgl:
