@@ -22,7 +22,7 @@ export TJ=$(expr ${TJ} + 1)
 echo ${SCPT}.out.${TJ} >> OUTFILE
 echo $SLURM_JOBID >> JOBIDS
 
-which orterun
+which $XRUN
 
 if [ "$?" = "1" ] || [ "${SLURM_TASKS_PER_NODE}" = "" ]; then
     if [ "@BLOCK2" = "1" ]; then
@@ -38,11 +38,19 @@ else
         [ -f ./FCIDUMP ] && rm ./FCIDUMP
         ln -s @TMPDIR/FCIDUMP ./FCIDUMP
         cp @TMPDIR/${SCPT}.conf ${SCPT}.conf.${TJ}
-        orterun --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
-            python3 -u $(which block2main) ${SCPT}.conf.${TJ} > ${SCPT}.out.${TJ}
+        if [ "$XRUN" = "srun" ]; then
+            srun python3 -u $(which block2main) ${SCPT}.conf.${TJ} > ${SCPT}.out.${TJ}
+        else
+            $XRUN --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
+                python3 -u $(which block2main) ${SCPT}.conf.${TJ} > ${SCPT}.out.${TJ}
+        fi
     else
-        orterun --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
-            python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+        if [ "$XRUN" = "srun" ]; then
+            srun python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+        else
+            $XRUN --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
+                python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+        fi
     fi
 fi
 

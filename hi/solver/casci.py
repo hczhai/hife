@@ -58,7 +58,7 @@ from pyscf import dmrgscf, lib
 import os
 
 dmrgscf.settings.BLOCKEXE = os.popen("which %s").read().strip()
-dmrgscf.settings.MPIPREFIX = ""
+dmrgscf.settings.MPIPREFIX = "" if "PYSCF_MPIPREFIX" not in os.environ else os.environ["PYSCF_MPIPREFIX"]
 
 mc.fcisolver = dmrgscf.DMRGCI(mol, maxM=%s, tol=%s)
 mc.fcisolver.runtimeDir = lib.param.TMPDIR

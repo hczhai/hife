@@ -37,4 +37,7 @@ echo SLURM_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 export PYTHONPATH=/home/hczhai/work/block2-old:$PYTHONPATH
 
+export XRUN=orterun
+export PYSCF_MPIPREFIX="$XRUN --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS"
+
 ### end:prelude.main
