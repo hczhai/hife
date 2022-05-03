@@ -69,6 +69,29 @@ mc.fcisolver.memory = int(mol.max_memory / 1000)
 mcfs = [mc.fcisolver]
 """
 
+DMRG_MIXSPIN = """
+from pyscf import dmrgscf, lib
+import os
+
+dmrgscf.settings.BLOCKEXE = os.popen("which %s").read().strip()
+dmrgscf.settings.MPIPREFIX = "" if "PYSCF_MPIPREFIX" not in os.environ else os.environ["PYSCF_MPIPREFIX"]
+
+mcfs = [dmrgscf.DMRGCI(mol, maxM=%s, tol=%s) for _ in range(2)]
+weights = [1.0 / len(mcfs)] * len(mcfs)
+
+mcfs[0].spin = 0
+mcfs[1].spin = spin
+
+for i, mcf in enumerate(mcfs):
+    mcf.runtimeDir = lib.param.TMPDIR + "/%%d" %% i
+    mcf.scratchDirectory = lib.param.TMPDIR + "/%%d" %% i
+    mcf.threads = int(os.environ["OMP_NUM_THREADS"])
+    mcf.memory = int(mol.max_memory / 1000) # mem in GB
+
+mc = mcscf.CASSCF(mf, nactorb, (nacta + nactb))
+mcscf.state_average_mix_(mc, mcfs, weights)
+"""
+
 CASCC = """
 import numpy as np
 from pyscf import cc, gto
@@ -215,9 +238,14 @@ def write(fn, pmc, pmf, is_casci=True):
             f.write(CASCC % (True, ))
 
         if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
-            f.write(DMRG % (
-                "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
-                pmc["maxm"], pmc["fci_conv_tol"]))
+            if "mixspin" in pmc:
+                f.write(DMRG_MIXSPIN % (
+                    "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
+                    pmc["maxm"], pmc["fci_conv_tol"]))
+            else:
+                f.write(DMRG % (
+                    "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
+                    pmc["maxm"], pmc["fci_conv_tol"]))
 
         if "dmrg-sch-sweeps" in pmc:
             f.write("for mcf in mcfs:\n")
@@ -243,7 +271,7 @@ def write(fn, pmc, pmf, is_casci=True):
             if "dmrg-1pdm" in pmc:
                 f.write("    mcf.block_extra_keyword = ['%s']\n" % "onepdm")
 
-        if "mixspin" in pmc:
+        if "mixspin" in pmc and not ("stackblock-dmrg" in pmc or "block2-dmrg" in pmc):
             f.write(CASSCF_MIXSPIN)
 
         if "step_size" in pmc:
