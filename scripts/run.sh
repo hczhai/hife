@@ -24,7 +24,7 @@ echo $SLURM_JOBID >> JOBIDS
 
 which $XRUN
 
-if [ "$?" = "1" ] || [ "${SLURM_TASKS_PER_NODE}" = "" ]; then
+if [ "$?" = "1" ] || [ "${SLURM_TASKS_PER_NODE}" = "" ] || [ "@SERIAL" = "1" ]; then
     if [ "@BLOCK2" = "1" ]; then
         [ -f ./FCIDUMP ] && rm ./FCIDUMP
         ln -s @TMPDIR/FCIDUMP ./FCIDUMP
