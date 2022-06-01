@@ -1,5 +1,5 @@
 
-from .mol import TIME_ST, TIME_ED
+from .mol import TIME_ST, TIME_ED, handle_io_error
 
 MF_LOAD = """
 from pyscf import scf
@@ -194,6 +194,7 @@ np.save("active_space.npy", (nactorb, nactelec))
 np.save("spin.npy", (spin, ))
 """
 
+@handle_io_error
 def write(fn, pmc, pmf, is_casci=True):
     with open(fn, "w") as f:
 

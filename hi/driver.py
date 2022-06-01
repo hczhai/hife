@@ -577,7 +577,7 @@ class HFDriver(BaseDriver):
         else:
             l = "run.sh"
         if "exclude" in opts:
-            cmd = "sed -i '3 i\\#SBATCH --exclude=:%s' %s" % (opts["exclude"], l)
+            cmd = "sed -i '3 i\\#SBATCH --exclude=%s' %s" % (opts["exclude"], l)
             print(os.popen(cmd).read().strip())
         cmd = '%s \"%s\"' % (jcmd[0], l)
         print("%s %s/%s" % ("submit", sec_key, l))

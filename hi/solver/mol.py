@@ -27,3 +27,15 @@ mol.build()
 print("NAO   = ", mol.nao)
 print("NELEC = ", mol.nelec)
 """
+
+def handle_io_error(f):
+    def ff(*args, **kwargs):
+        while True:
+            try:
+                r = f(*args, **kwargs)
+            except BlockingIOError as err:
+                print(err)
+            else:
+                break
+        return r
+    return ff

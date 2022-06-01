@@ -1,5 +1,5 @@
 
-from .mol import TIME_ST, TIME_ED
+from .mol import TIME_ST, TIME_ED, handle_io_error
 
 MF_LOAD = """
 from pyscf import scf, lib
@@ -189,6 +189,7 @@ np.save("nat_occ.npy", nat_occ[..., ::-1])
 print('nat occ', np.sum(nat_occ, axis=-1), nat_occ)
 """
 
+@handle_io_error
 def write(fn, pmc, pmf):
     with open(fn, "w") as f:
 
