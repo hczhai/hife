@@ -26,7 +26,7 @@ from libdmet.basis_transform import make_basis
 ld = lo.orth_ao(mol, 'lowdin', pre_orth_ao='SCF')
 dl0 = make_basis.transform_rdm1_to_lo_mol(dm0, ld, rmf.get_ovlp())
 
-dspin = float(%s)
+dspin = float(%s) / 2
 afm = %s
 
 if afm:
