@@ -88,9 +88,12 @@ def write(fn, pmf):
         if "cart" in pmf:
             f.write("mol.cart = True\n")
 
+        if "dftd3" in pmf:
+            f.write("from pyscf import dftd3\n")
+
         f.write(MOL_FINAL)
 
-        def xmethod(method, x2c):
+        def xmethod(method, x2c, dftd3):
             if method == "uhf":
                 r = "scf.UHF(mol)"
             elif method == "uks":
@@ -101,9 +104,11 @@ def write(fn, pmf):
                 r = "scf.RKS(mol)"
             else:
                 raise RuntimeError("Unknown mf method %s!" % method)
-            return "scf.sfx2c(%s)" % r if x2c else r
+            r = "scf.sfx2c(%s)" % r if x2c else r
+            r = "dftd3.dftd3(%s)" % r if dftd3 else r
+            return r
         
-        mme = xmethod(pmf["method"], "x2c" in pmf)
+        mme = xmethod(pmf["method"], "x2c" in pmf, "dftd3" in pmf)
         f.write("dm = None\n")
 
         if "dimer_init" in pmf:
@@ -126,7 +131,8 @@ def write(fn, pmf):
             else:
                 sm_conv_tol = [pmf["conv_tol"]] * len(sigmas)
             if "smearing_method" in pmf:
-                sm_mme = [xmethod(x, "x2c" in pmf) for x in pmf["smearing_method"].split(";")]
+                sm_mme = [xmethod(x, "x2c" in pmf, "dftd3" in pmf)
+                    for x in pmf["smearing_method"].split(";")]
             else:
                 sm_mme = [mme] * len(sigmas)
             for sg, mc, ct, sm in zip(sigmas, sm_max_cycle, sm_conv_tol, sm_mme):

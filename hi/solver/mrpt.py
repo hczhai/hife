@@ -7,6 +7,7 @@ import numpy as np
 mfchk = "%s"
 mol, mfx = scf.chkfile.load_scf(mfchk)
 x2c = %s
+d3 = %s
 nactorb = None
 nactelec = None
 spin = None
@@ -46,6 +47,9 @@ else:
     mf = scf.RHF(mol)
 if x2c:
     mf = scf.sfx2c(mf)
+if d3:
+    from pyscf import dftd3
+    mf = dftd3.dftd3(mf)
 
 mf.chkfile = "mf.chk"
 mf.mo_coeff = coeff
@@ -127,7 +131,7 @@ def write(fn, pmc, pmf):
         if "/" not in lde:
             lde = "../" + lde
 
-        f.write(MF_LOAD % (lde + "/mf.chk", "x2c" in pmf))
+        f.write(MF_LOAD % (lde + "/mf.chk", "x2c" in pmf, "dftd3" in pmf))
 
         lde = pmc["load_coeff"]
         if "/" not in lde:

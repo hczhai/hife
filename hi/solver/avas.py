@@ -62,16 +62,21 @@ def write(fn, pmc, pmf):
 
         f.write(TIME_ST)
 
-        def xmethod(method, x2c):
+        if "dftd3" in pmf:
+            f.write("from pyscf import dftd3\n")
+
+        def xmethod(method, x2c, dftd3):
             if method == "uhf" or method == "uks":
                 r = "scf.UHF(mol)"
             elif method == "rhf" or method == "rks":
                 r = "scf.RHF(mol)"
             else:
                 raise RuntimeError("Unknown mf method %s!" % method)
-            return "scf.sfx2c(%s)" % r if x2c else r
+            r = "scf.sfx2c(%s)" % r if x2c else r
+            r = "dftd3.dftd3(%s)" % r if dftd3 else r
+            return r
 
-        mme = xmethod(pmf["method"], "x2c" in pmf)
+        mme = xmethod(pmf["method"], "x2c" in pmf, "dftd3" in pmf)
         lde = pmc["load_mf"]
         if "/" not in lde:
             lde = "../" + lde
