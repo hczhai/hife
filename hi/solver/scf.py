@@ -93,7 +93,7 @@ def write(fn, pmf):
 
         f.write(MOL_FINAL)
 
-        def xmethod(method, x2c, dftd3):
+        def xmethod(method, x2c):
             if method == "uhf":
                 r = "scf.UHF(mol)"
             elif method == "uks":
@@ -105,10 +105,9 @@ def write(fn, pmf):
             else:
                 raise RuntimeError("Unknown mf method %s!" % method)
             r = "scf.sfx2c(%s)" % r if x2c else r
-            r = "dftd3.dftd3(%s)" % r if dftd3 else r
             return r
         
-        mme = xmethod(pmf["method"], "x2c" in pmf, "dftd3" in pmf)
+        mme = xmethod(pmf["method"], "x2c" in pmf)
         f.write("dm = None\n")
 
         if "dimer_init" in pmf:
@@ -131,8 +130,7 @@ def write(fn, pmf):
             else:
                 sm_conv_tol = [pmf["conv_tol"]] * len(sigmas)
             if "smearing_method" in pmf:
-                sm_mme = [xmethod(x, "x2c" in pmf, "dftd3" in pmf)
-                    for x in pmf["smearing_method"].split(";")]
+                sm_mme = [xmethod(x, "x2c" in pmf) for x in pmf["smearing_method"].split(";")]
             else:
                 sm_mme = [mme] * len(sigmas)
             for sg, mc, ct, sm in zip(sigmas, sm_max_cycle, sm_conv_tol, sm_mme):
@@ -140,6 +138,8 @@ def write(fn, pmf):
                 if "KS" in sm:
                     f.write("mf.xc = '%s'\n" % pmf["func"])
                 f.write("mf.max_cycle = %s\n" % mc)
+                if "dftd3" in pmf:
+                    f.write("mf = dftd3.dftd3(mf)\n")
                 f.write(MF_FINAL + "\n")
 
         f.write(MF % (mme, pmf["conv_tol"]))
@@ -147,6 +147,8 @@ def write(fn, pmf):
             f.write("mf.xc = '%s'\n" % pmf["func"])
         if "max_cycle" in pmf:
             f.write("mf.max_cycle = %s\n" % pmf["max_cycle"])
+        if "dftd3" in pmf:
+            f.write("mf = dftd3.dftd3(mf)\n")
         
         if "direct_newton" in pmf:
             f.write("mf = mf.newton()\n")
