@@ -61,12 +61,41 @@ if fix_spin:
 mc.fcisolver.conv_tol = %s
 mc.canonicalization = True
 mc.natorb = True
+
+mcfs = [mc.fcisolver]
+"""
+
+CASCI_FINAL = """
+for mcf in mcfs:
+    mcf.conv_tol = %s
 mc.kernel()
+"""
+
+DMRG = """
+from pyscf import dmrgscf, lib
+import os
+
+dmrgscf.settings.BLOCKEXE = os.popen("which %s").read().strip()
+dmrgscf.settings.BLOCKEXE_COMPRESS_NEVPT = os.popen("which %s").read().strip()
+dmrgscf.settings.MPIPREFIX = "" if "PYSCF_MPIPREFIX" not in os.environ else os.environ["PYSCF_MPIPREFIX"]
+
+mc.fcisolver = dmrgscf.DMRGCI(mol, maxM=%s, tol=%s)
+mc.fcisolver.runtimeDir = lib.param.TMPDIR
+mc.fcisolver.scratchDirectory = lib.param.TMPDIR
+mc.fcisolver.threads = int(os.environ["OMP_NUM_THREADS"])
+mc.fcisolver.memory = int(mol.max_memory / 1000)
+
+mcfs = [mc.fcisolver]
 """
 
 SCNEVPT2 = """
 from pyscf import mrpt
 sc = mrpt.NEVPT(mc).set(canonicalized=True).run()
+"""
+
+SCNEVPT2_DMRG = """
+from pyscf import mrpt
+sc = mrpt.NEVPT(mc).set(canonicalized=True).compress_approx(maxM=%s).run()
 """
 
 ICNEVPT2 = """
@@ -158,11 +187,47 @@ def write(fn, pmc, pmf):
             pmc["fci_conv_tol"])
         )
 
+        if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
+            f.write(DMRG % (
+                "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
+                "block.spin_adapted" if "stackblock-dmrg" in pmc else "block2main",
+                pmc["maxm"], pmc["fci_conv_tol"]))
+
+        if "dmrg-sch-sweeps" in pmc:
+            f.write("for mcf in mcfs:\n")
+            f.write("    mcf.scheduleSweeps = %s\n" % list(map(int, pmc["dmrg-sch-sweeps"].split(";"))))
+            assert len(pmc["dmrg-sch-maxms"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+            f.write("    mcf.scheduleMaxMs = %s\n" % list(map(int, pmc["dmrg-sch-maxms"].split(";"))))
+            if ";" in pmc["dmrg-sch-tols"]:
+                assert len(pmc["dmrg-sch-tols"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+                f.write("    mcf.scheduleTols = %s\n" % list(map(float, pmc["dmrg-sch-tols"].split(";"))))
+            else:
+                f.write("    mcf.scheduleTols = %s\n" % ([float(pmc["dmrg-sch-tols"])] * len(pmc["dmrg-sch-sweeps"].split(";"))))
+            if ";" in pmc["dmrg-sch-noises"]:
+                assert len(pmc["dmrg-sch-noises"].split(";")) == len(pmc["dmrg-sch-sweeps"].split(";"))
+                f.write("    mcf.scheduleNoises = %s\n" % list(map(float, pmc["dmrg-sch-noises"].split(";"))))
+            else:
+                f.write("    mcf.scheduleNoises = %s\n" % ([float(pmc["dmrg-sch-noises"])] * len(pmc["dmrg-sch-sweeps"].split(";"))))
+            f.write("    mcf.maxIter = %s\n" % pmc["dmrg-max-iter"])
+            f.write("    mcf.twodot_to_onedot = %s\n" % pmc["dmrg-tto"])
+            if "dmrg-tol" in pmc:
+                f.write("    mcf.tol = %s\n" % pmc["dmrg-tol"])
+            if "dmrg-no-2pdm" in pmc:
+                f.write("    mcf.twopdm = False\n")
+            if "dmrg-1pdm" in pmc:
+                f.write("    mcf.block_extra_keyword = ['%s']\n" % "onepdm")
+
+        f.write(CASCI_FINAL %
+            pmc["fci_conv_tol"]
+        )
+
         if pmc["method"] == "sc-nevpt2":
             if "solver" in pmc and pmc["solver"] == "block2":
                 f.write(SCNEVPT2_B2)
-            else:
+            elif not ("stackblock-dmrg" in pmc or "block2-dmrg" in pmc):
                 f.write(SCNEVPT2)
+            else:
+                f.write(SCNEVPT2_DMRG % pmc["maxm"])
         elif pmc["method"] == "ic-nevpt2":
             f.write(ICNEVPT2)
         elif pmc["method"] == "ic-mrrept2":

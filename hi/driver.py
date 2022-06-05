@@ -420,7 +420,12 @@ class HFDriver(BaseDriver):
         def_pos = { "0": "stage" }
         opts = { "fci_conv_tol": "1E-10", "frac_occ_tol": "1E-6" }
         optl = [ "load_mf", "load_coeff", "spin",
-            "nactorb", "nactelec", "method", "solver", "fix_spin" ] + list(opts.keys())
+            "stackblock-dmrg", "block2-dmrg", "maxm",
+            "nactorb", "nactelec", "method", "solver", "fix_spin",
+            "dmrg-sch-sweeps", "dmrg-sch-maxms",
+            "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
+            "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
+            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
