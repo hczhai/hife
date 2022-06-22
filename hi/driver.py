@@ -390,7 +390,7 @@ class HFDriver(BaseDriver):
             "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
             "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
             "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
-            "cas_ccsd", "cas_ccsd_t" ] + list(opts.keys())
+            "cas_ccsd", "cas_ccsd_t", "nonspinadapted" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:

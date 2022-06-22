@@ -276,6 +276,10 @@ def write(fn, pmc, pmf, is_casci=True):
             if "dmrg-1pdm" in pmc:
                 f.write("    mcf.block_extra_keyword = ['%s']\n" % "onepdm")
 
+        if "nonspinadapted" in pmc:
+            f.write("for mcf in mcfs:\n")
+            f.write("    mcf.nonspinAdapted = True\n")
+
         if "mixspin" in pmc and not ("stackblock-dmrg" in pmc or "block2-dmrg" in pmc):
             f.write(CASSCF_MIXSPIN)
 
