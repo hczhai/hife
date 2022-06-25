@@ -123,7 +123,9 @@ class CCSolver:
             mf.mo_occ = np.zeros((2, norb))
             mf.mo_occ[0][:nelec[0]] += 1.0
             mf.mo_occ[1][:nelec[1]] += 1.0
-        self.cc = cc.CCSD(mf).run()
+        self.cc = cc.CCSD(mf)
+        self.cc.level_shift = %s
+        self.cc.run()
         if self.ccsd_t:
             e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
         else:
@@ -237,10 +239,10 @@ def write(fn, pmc, pmf, is_casci=True):
         ))
 
         if "cas_ccsd" in pmc:
-            f.write(CASCC % (False, ))
+            f.write(CASCC % (pmc.get("level_shift", 0.0), False, ))
 
         if "cas_ccsd_t" in pmc:
-            f.write(CASCC % (True, ))
+            f.write(CASCC % (pmc.get("level_shift", 0.0), True, ))
 
         if "stackblock-dmrg" in pmc or "block2-dmrg" in pmc:
             if "mixspin" in pmc:
