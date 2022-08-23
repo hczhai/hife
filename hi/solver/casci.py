@@ -165,10 +165,11 @@ class UCCSolver:
         mf._eri = h2
         mf.get_hcore = lambda *args: h1
         mf.get_ovlp = lambda *args: np.identity(norb)
-        mf.max_cycle = 0
+        mf.max_cycle = %s
         mf.kernel(dm0=self.dmcas)
         self.cc = cc.UCCSD(mf)
         self.cc.level_shift = %s
+        self.cc.max_cycle = %s
         self.cc.run()
         if self.ccsd_t:
             e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
@@ -285,10 +286,18 @@ def write(fn, pmc, pmf, is_casci=True):
         ))
 
         if "cas_uccsd" in pmc:
-            f.write(CASUCC % (mf_lde, pmc.get("level_shift", 0.0), False, ))
+            f.write(CASUCC % (mf_lde,
+                pmc.get("cas_ucc_mf_max_cycle", 0),
+                pmc.get("level_shift", 0.0),
+                pmc.get("cas_ucc_cc_max_cycle", 100),
+                False, ))
 
         if "cas_uccsd_t" in pmc:
-            f.write(CASUCC % (mf_lde, pmc.get("level_shift", 0.0), True, ))
+            f.write(CASUCC % (mf_lde,
+                pmc.get("cas_ucc_mf_max_cycle", 0),
+                pmc.get("level_shift", 0.0),
+                pmc.get("cas_ucc_cc_max_cycle", 100),
+                True, ))
 
         if "cas_ccsd" in pmc:
             f.write(CASCC % (pmc.get("level_shift", 0.0), False, ))

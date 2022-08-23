@@ -391,6 +391,7 @@ class HFDriver(BaseDriver):
             "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
             "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
             "cas_ccsd", "cas_ccsd_t", "cas_uccsd", "cas_uccsd_t",
+            "cas_ucc_mf_max_cycle", "cas_ucc_cc_max_cycle",
             "nonspinadapted", "level_shift" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
@@ -567,7 +568,7 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude", "restart",
+        optl = [ "exclude", "restart", "reservation",
             "block2-dmrg", "block2-dmrg-rev", "block2-dmrg-csf" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
@@ -584,6 +585,9 @@ class HFDriver(BaseDriver):
             l = "run.sh"
         if "exclude" in opts:
             cmd = "sed -i '3 i\\#SBATCH --exclude=%s' %s" % (opts["exclude"], l)
+            print(os.popen(cmd).read().strip())
+        if "reservation" in opts:
+            cmd = "sed -i '3 i\\#SBATCH --reservation=%s' %s" % (opts["reservation"], l)
             print(os.popen(cmd).read().strip())
         cmd = '%s \"%s\"' % (jcmd[0], l)
         print("%s %s/%s" % ("submit", sec_key, l))
