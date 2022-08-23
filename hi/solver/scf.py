@@ -82,6 +82,9 @@ def write(fn, pmf):
             pmf["charge"]
         ))
 
+        if "ecp" in pmf:
+            f.write("mol.ecp = \"%s\"\n" % pmf["ecp"])
+
         if "max_memory" in pmf:
             f.write("mol.max_memory = %s\n" % pmf["max_memory"])
 
@@ -102,6 +105,12 @@ def write(fn, pmf):
                 r = "scf.RHF(mol)"
             elif method == "rks":
                 r = "scf.RKS(mol)"
+            elif method == "dhf":
+                r = "scf.DHF(mol).set(with_gaunt=False, with_breit=False)"
+            elif method == "dhf-gaunt":
+                r = "scf.DHF(mol).set(with_gaunt=True, with_breit=False)"
+            elif method == "dhf-breit":
+                r = "scf.DHF(mol).set(with_gaunt=True, with_breit=True)"
             else:
                 raise RuntimeError("Unknown mf method %s!" % method)
             r = "scf.sfx2c(%s)" % r if x2c else r

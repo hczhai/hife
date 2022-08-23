@@ -143,6 +143,50 @@ mc.fcisolver = CCSolver(ccsd_t=%s)
 mcfs = [mc.fcisolver]
 """
 
+CASUCC = """
+import numpy as np
+from pyscf import cc, gto
+from libdmet.basis_transform import make_basis
+
+scf_dmao = np.load("%s/mf_dmao.npy")
+scf_dmlo = make_basis.transform_rdm1_to_lo_mol(scf_dmao, coeff, mf.get_ovlp())
+dmcas = scf_dmlo[:, mc.ncore:mc.ncore + mc.ncas, mc.ncore:mc.ncore + mc.ncas]
+
+class UCCSolver:
+    def __init__(self, ccsd_t=False, dmcas=None):
+        self.ccsd_t = ccsd_t
+        self.dmcas = dmcas
+
+    def kernel(self, h1, h2, norb, nelec, ci0=None, ecore=0, **kwargs):
+        mol = gto.M(verbose=4)
+        mol.nelectron = sum(nelec)
+        mol.spin = nelec[0] - nelec[1]
+        mf = mol.UHF()
+        mf._eri = h2
+        mf.get_hcore = lambda *args: h1
+        mf.get_ovlp = lambda *args: np.identity(norb)
+        mf.max_cycle = 0
+        mf.kernel(dm0=self.dmcas)
+        self.cc = cc.UCCSD(mf)
+        self.cc.level_shift = %s
+        self.cc.run()
+        if self.ccsd_t:
+            e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
+        else:
+            e_ccsd_t = self.cc.e_tot
+        return e_ccsd_t + ecore, dict(t1=self.cc.t1, t2=self.cc.t2)
+
+    def make_rdm1(self, t12, norb, nelec):
+        dms = self.cc.make_rdm1(**t12)
+        if isinstance(dms, tuple):
+            return dms[0] + dms[1]
+        else:
+            return dms
+
+mc.fcisolver = UCCSolver(ccsd_t=%s, dmcas=dmcas)
+mcfs = [mc.fcisolver]
+"""
+
 CASSCF_MIXSPIN = """
 from pyscf import fci
 mch = mc
@@ -209,6 +253,8 @@ def write(fn, pmc, pmf, is_casci=True):
         lde = pmc["load_mf"]
         if "/" not in lde:
             lde = "../" + lde
+        
+        mf_lde = lde
 
         f.write(MF_LOAD % (lde + "/mf.chk", "x2c" in pmf, "dftd3" in pmf))
 
@@ -237,6 +283,12 @@ def write(fn, pmc, pmf, is_casci=True):
             "False" if "no_canonicalize" in pmc else "True",
             "False" if "no_canonicalize" in pmc else "True"
         ))
+
+        if "cas_uccsd" in pmc:
+            f.write(CASUCC % (mf_lde, pmc.get("level_shift", 0.0), False, ))
+
+        if "cas_uccsd_t" in pmc:
+            f.write(CASUCC % (mf_lde, pmc.get("level_shift", 0.0), True, ))
 
         if "cas_ccsd" in pmc:
             f.write(CASCC % (pmc.get("level_shift", 0.0), False, ))

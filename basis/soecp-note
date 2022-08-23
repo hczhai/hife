@@ -1,0 +1,8 @@
+ECPDS10MDFSO : K Ca Cu Zn Ga Ge As Se Br Kr
+ECPDS28MDFSO : Ge As Se Br Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe
+ECPDS28MWBSO : La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu
+ECPDS46MDFSO : Sn Sb Te I Cs Ba
+ECPDS60MDFSO : Au Hg Tl Pb Bi Po At Rn
+ECPDS60MWBSO : Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr
+ECPDS78MDFSO : Pb Bi Po At Fr Ra
+ECPDS92MDFBSO: Rg Cn Nh Fl Mc Lv Ts Og
