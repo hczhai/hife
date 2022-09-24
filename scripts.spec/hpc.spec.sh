@@ -4,6 +4,7 @@
 #SBATCH -o LOG.%j
 #SBATCH -q @QUEUE
 #SBATCH --nodes=@NNODES
+#SBATCH --partition=@PART
 #SBATCH --time=@TIME
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=@NCORES

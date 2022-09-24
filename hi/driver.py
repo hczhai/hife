@@ -21,7 +21,7 @@ def get_host():
     return 'unknown'
 
 host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24, 'cori': 32 }
-host_part = {'pauling': 'serial,parallel', 'hpc': '', 'mac': '', 'cori': '' }
+host_part = {'pauling': 'serial,parallel', 'hpc': 'any', 'mac': '', 'cori': '' }
 host_def_queue = {'pauling': 'normal', 'cori': 'regular', 'hpc': 'normal', 'mac': ''}
 extra_basis = { 'def2-sv(p)': 'def2-svpp.dat' }
 
