@@ -324,7 +324,7 @@ class HFDriver(BaseDriver):
         opts = {}
         optl = [ "load_mf", "load_coeff", "no_loc", "cas_list",
             "nactorb", "nactelec", "split_low", "split_high",
-            "alpha", "beta", "uno" ] + list(opts.keys())
+            "alpha", "beta", "uno", "average_occ" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:

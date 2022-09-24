@@ -35,6 +35,7 @@ split_high = 0.0
 alpha = False
 beta = False
 uno = False
+average_occ = False
 """
 
 SELECT = """
@@ -105,6 +106,30 @@ elif uno:
 
     np.save("lo_coeff.npy", coeff)
     np.save("lo_occ.npy", mo_occ)
+
+    if average_occ:
+        for fname in ["cc_mo_coeff.npy"]:
+            if os.path.isfile(lde + "/" + fname):
+                print("use: " + lde + "/" + fname)
+                mo_coeff = np.load(lde + "/" + fname)
+                break
+
+        for fname in ["cc_dmmo.npy"]:
+            if os.path.isfile(lde + "/" + fname):
+                print("use: " + lde + "/" + fname)
+                dmmo = np.load(lde + "/" + fname)
+                break
+        
+        dmao = np.einsum('...pi,...ij,...qj->pq', mo_coeff, dmmo, mo_coeff)
+
+        coeff_inv = np.linalg.pinv(coeff)
+        dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv)
+
+        print('AVERAGE TRACE = %8.5f' % np.trace(dmmo))
+
+        nat_occ, u = np.linalg.eigh(dmmo)
+        print('AVERAGE NAT OCC = ', ''.join(['%8.5f,' % x for x in nat_occ[::-1]]))
+
 """
 
 SELECT2 = """
@@ -230,6 +255,9 @@ def write(fn, pma):
 
         if "uno" in pma:
             f.write("uno = True\n")
+
+        if "average_occ" in pma:
+            f.write("average_occ = True\n")
 
         f.write("do_loc = %s\n" % (False if "no_loc" in pma else True))
 
