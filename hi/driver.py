@@ -245,7 +245,7 @@ class HFDriver(BaseDriver):
             "bcc_max_cycle": 10
         }
         optl = [ "load_mf", "load_coeff", "level_shift", "no_ccsd_t",
-            "do_spin_square", "frozen", "spin", "bcc" ] + list(opts.keys())
+            "do_spin_square", "frozen", "spin", "bcc", "max_memory" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:

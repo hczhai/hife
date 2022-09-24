@@ -224,6 +224,9 @@ def write(fn, pmc, pmf):
             f.write("spin = None\n")
 
         f.write(MF_LOAD % (lde + "/mf.chk", mme))
+        
+        if "max_memory" in pmc:
+            f.write("mol.max_memory = %s\n" % pmc["max_memory"])
 
         if "no_ccsd_t" in pmc:
             f.write("do_ccsd_t = False\n")
