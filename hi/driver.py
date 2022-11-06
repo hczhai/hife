@@ -104,7 +104,7 @@ class HFDriver(BaseDriver):
 
     def __init__(self, argv):
         super().__init__(argv)
-        self.tasks = ["init", "show", "clean", "mf", "cc",
+        self.tasks = ["init", "show", "clean", "mf", "cc", "mp",
             "set", "create", "submit", "log", "act", "orb",
             "ex", "select", "casci", "casscf", "mrpt", "avas"]
 
@@ -232,6 +232,36 @@ class HFDriver(BaseDriver):
             if k in opts:
                 pre[sec_key][k] = opts[k]
         pre[sec_key]["geometry"] = geom
+        write_json(pre, "./hife-parameters.json")
+
+    def mp(self, args):
+        """Moller–Plesset perturbation theory calculation."""
+        pre = self.pre_info()
+        self.to_dir(dox="local")
+        def_pos = { "0": "stage" }
+        opts = {
+            "max_cycle": "1000",
+        }
+        optl = [ "load_mf", "load_coeff", "do_spin_square",
+            "frozen", "spin", "max_memory", "non_canonical" ] + list(opts.keys())
+        opts.update(read_opts(args, def_pos, optl))
+        for k in [ "stage", "load_mf" ]:
+            if k not in opts:
+                raise RuntimeError("no %s argument found!" % k)
+        sec_key = "mp-%s" % opts["stage"]
+        if sec_key in pre:
+            raise RuntimeError("key %s already used!" % sec_key)
+        if opts["load_mf"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_mf"])
+        if "load_coeff" in opts and opts["load_coeff"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_coeff"])
+        pre[sec_key] = {}
+        for k in optl:
+            if k in opts:
+                pre[sec_key][k] = opts[k]
+        print("%s mol based on %s" % (sec_key, pre[sec_key]["load_mf"]))
+        if "load_coeff" in opts:
+            print("%s orb based on %s" % (sec_key, pre[sec_key]["load_coeff"]))
         write_json(pre, "./hife-parameters.json")
 
     def cc(self, args):
@@ -493,6 +523,9 @@ class HFDriver(BaseDriver):
         elif args[0] == "cc":
             from .solver.cc import write
             write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]])
+        elif args[0] == "mp":
+            from .solver.mp import write
+            write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]])
         elif args[0] == "act":
             from .solver.active import write
             write("%s/hife.py" % xdir, pre[sec_key])
@@ -662,6 +695,8 @@ class HFDriver(BaseDriver):
                             ex = "!!! NO CONV !!!"
                         elif ex == "!!! NO CONV !!!" and "SCF energy" in xgl:
                             ex += xgl.split("=")[1].split()[0]
+                        elif xgl.startswith("EMP2     ="):
+                            ex = " ".join(xgl.split())
                         elif xgl.startswith("ECCSD    ="):
                             ex = " ".join(xgl.split())
                         elif xgl.startswith("ECCSD(T) ="):
@@ -721,6 +756,11 @@ class HFDriver(BaseDriver):
             elif k.startswith("cc-"):
                 if "level_shift" in v:
                     print("[%s] :: load = %s level_shift = %s%s" % (k, v["load_mf"], v["level_shift"], extra))
+                else:
+                    print("[%s] :: load = %s%s" % (k, v["load_mf"], extra))
+            elif k.startswith("mp-"):
+                if "non_canonical" in v:
+                    print("[%s] :: load = %s non_canonical = T%s" % (k, v["load_mf"], extra))
                 else:
                     print("[%s] :: load = %s%s" % (k, v["load_mf"], extra))
             elif "load_mf" in v:
