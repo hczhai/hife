@@ -66,8 +66,7 @@ print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
 
 from pyscf import mp
 mc = mp.MP2(mf)
-if non_canonical:
-    mf.converged = False
+mf.converged = not non_canonical
 mc.diis_file = lib.param.TMPDIR + '/mpdiis.h5'
 mc.max_cycle = %s
 """
@@ -77,8 +76,7 @@ print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
 
 from pyscf import mp
 mc = mp.MP2(mf, frozen=%s)
-if non_canonical:
-    mf.converged = False
+mf.converged = not non_canonical
 mc.diis_file = lib.param.TMPDIR + '/mpdiis.h5'
 mc.max_cycle = %s
 """
