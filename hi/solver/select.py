@@ -120,7 +120,9 @@ elif uno:
                 dmmo = np.load(lde + "/" + fname)
                 break
         
-        dmao = np.einsum('...pi,...ij,...qj->pq', mo_coeff, dmmo, mo_coeff)
+        dmao = np.einsum('...pi,...ij,...qj->...pq', mo_coeff, dmmo, mo_coeff)
+        if dmao.ndim == 3:
+            dmao = np.einsum('spq->pq', dmao)
 
         coeff_inv = np.linalg.pinv(coeff)
         dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv)
