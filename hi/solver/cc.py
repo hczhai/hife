@@ -177,9 +177,9 @@ np.save("cc_mo_coeff.npy", mc.mo_coeff)
 np.save("cc_e_tot.npy", mc.e_tot)
 np.save("cc_dmmo.npy", dm)
 
-# dmao = np.einsum('xpi,xij,xqj->xpq', mc.mo_coeff, dm, mc.mo_coeff)
+# dmao = np.einsum('xpi,xij,xqj->xpq', mc.mo_coeff, dm, mc.mo_coeff, optimize=True)
 # coeff_inv = np.linalg.pinv(mc.mo_coeff)
-# dmmo = np.einsum('xip,xpq,xjq->xij', coeff_inv, dmao, coeff_inv)
+# dmmo = np.einsum('xip,xpq,xjq->xij', coeff_inv, dmao, coeff_inv, optimize=True)
 
 nat_occ, u = np.linalg.eigh(dm)
 nat_coeff = np.einsum('...pi,...ij->...pj', mc.mo_coeff, u, optimize=True)

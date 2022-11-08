@@ -320,7 +320,7 @@ for iorb in range(norb):
     print(text + ftext + " " + gtext)
     texts[iorb] = text + "\\n" + gtext
 
-dmao = np.einsum('i,pi,qi->pq', mo_occ, coeff, coeff)
+dmao = np.einsum('i,pi,qi->pq', mo_occ, coeff, coeff, optimize=True)
 np.save("lo_occ.npy", mo_occ)
 np.save("lo_coeff.npy", coeff)
 np.save("lo_texts.npy", texts)

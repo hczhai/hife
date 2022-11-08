@@ -26,7 +26,7 @@ dmao = mf.make_rdm1()
 if dmao[0].ndim == 2:
     dmao = dmao[0] + dmao[1]
 coeff_inv = np.linalg.pinv(coeff)
-dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv)
+dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv, optimize=True)
 mo_occ = np.diag(dmmo)
 
 norb = coeff.shape[1]

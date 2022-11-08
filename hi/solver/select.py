@@ -120,12 +120,12 @@ elif uno:
                 dmmo = np.load(lde + "/" + fname)
                 break
         
-        dmao = np.einsum('...pi,...ij,...qj->...pq', mo_coeff, dmmo, mo_coeff)
+        dmao = np.einsum('...pi,...ij,...qj->...pq', mo_coeff, dmmo, mo_coeff, optimize=True)
         if dmao.ndim == 3:
-            dmao = np.einsum('spq->pq', dmao)
+            dmao = np.einsum('spq->pq', dmao, optimize=True)
 
         coeff_inv = np.linalg.pinv(coeff)
-        dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv)
+        dmmo = np.einsum('ip,pq,jq->ij', coeff_inv, dmao, coeff_inv, optimize=True)
 
         print('AVERAGE TRACE = %8.5f' % np.trace(dmmo))
 

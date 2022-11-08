@@ -225,7 +225,7 @@ dmao = mc.make_rdm1()
 ALL_FINAL = """
 import numpy as np
 coeff_inv = np.linalg.pinv(mc.mo_coeff)
-dmmo = np.einsum('...ip,...pq,...jq->...ij', coeff_inv, dmao, coeff_inv)
+dmmo = np.einsum('...ip,...pq,...jq->...ij', coeff_inv, dmao, coeff_inv, optimize=True)
 if dmmo[0].ndim == 2:
     mc_occ = np.diag(dmmo[0]) + np.diag(dmmo[1])
 else:
