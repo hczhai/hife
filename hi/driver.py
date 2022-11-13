@@ -487,7 +487,7 @@ class HFDriver(BaseDriver):
             "time": pre["create"]["time"],
             "nodes": pre["hosts"]["nodes"],
             "cores": pre["hosts"]["cores"], 
-            "name": "%s.%s.hife" % (pre["create"]["name"][:3], args[1]),
+            "name": "%s.%s.hife" % (pre["create"]["name"][:4], args[1]),
             "mem": pre["hosts"]["mem"],
             "partition": pre["hosts"]["partition"],
             "queue": host_def_queue[pre["hosts"]["name"]],
