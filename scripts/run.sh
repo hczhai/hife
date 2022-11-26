@@ -31,7 +31,7 @@ if [ "$?" = "1" ] || [ "${SLURM_TASKS_PER_NODE}" = "" ] || [ "@SERIAL" = "1" ]; 
         cp @TMPDIR/${SCPT}.conf ${SCPT}.conf.${TJ}
         python3 -u $(which block2main) ${SCPT}.conf.${TJ} > ${SCPT}.out.${TJ}
     else
-        python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+        python3 -u ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
     fi
 else
     if [ "@BLOCK2" = "1" ]; then
@@ -46,10 +46,10 @@ else
         fi
     else
         if [ "$XRUN" = "srun" ]; then
-            srun python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+            srun python3 -u ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
         else
             $XRUN --map-by ppr:$SLURM_TASKS_PER_NODE:node:pe=$OMP_NUM_THREADS \
-                python3 ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
+                python3 -u ${SCPT}.py @RESTART > ${SCPT}.out.${TJ}
         fi
     fi
 fi

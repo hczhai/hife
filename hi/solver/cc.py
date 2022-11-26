@@ -2,7 +2,7 @@
 from .mol import TIME_ST, TIME_ED, handle_io_error
 
 MF_LOAD = """
-from pyscf import scf, lib
+from pyscf import scf, lib, symm
 import numpy as np
 mfchk = "%s"
 mol, mfx = scf.chkfile.load_scf(mfchk)
@@ -18,6 +18,8 @@ mf.mo_occ = mfx["mo_occ"]
 do_ccsd_t = True
 bcc = False
 do_spin_square = False
+nat_with_pg = False
+save_amps = False
 """
 
 CC_LOAD_COEFF = """
@@ -91,6 +93,10 @@ else:
 e_ccsd = mc.e_tot
 print('ECCSD    = ', e_ccsd)
 print("PART TIME (CCSD) = %20.3f" % (time.perf_counter() - txst))
+
+if save_amps:
+    np.save("ccsd_t1.npy", mc.t1)
+    np.save("ccsd_t2.npy", mc.t2)
 
 if do_spin_square:
     S2 = mc.spin_square()[0]
@@ -187,6 +193,42 @@ np.save("nat_coeff.npy", nat_coeff[..., ::-1])
 np.save("nat_occ.npy", nat_occ[..., ::-1])
 
 print('nat occ', np.sum(nat_occ, axis=-1), nat_occ)
+
+if nat_with_pg:
+    np.save("nat_coeff_no_pg.npy", nat_coeff[..., ::-1])
+    np.save("nat_occ_no_pg.npy", nat_occ[..., ::-1])
+
+    orb_sym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, mc.mo_coeff, tol=1e-2)
+    orb_sym = [symm.irrep_name2id(mol.groupname, ir) for ir in orb_sym]
+    if np.array(dm).ndim == 3:
+        spdm = np.sum(dm, axis=0)
+    else:
+        spdm = dm
+    n_sites = len(spdm)
+    spdm = spdm.flatten()
+    nat_occ = np.zeros((n_sites, ))
+
+    import block2 as b
+    b.MatrixFunctions.block_eigs(spdm, nat_occ, b.VectorUInt8(orb_sym))
+    rot = np.array(spdm.reshape((n_sites, n_sites)).T, copy=True)
+    midx = np.argsort(nat_occ)[::-1]
+    nat_occ = nat_occ[midx]
+    rot = rot[:, midx]
+    orb_sym = np.array(orb_sym)[midx]
+    for isym in set(orb_sym):
+        mask = np.array(orb_sym) == isym
+        for j in range(len(nat_occ[mask])):
+            mrot = rot[mask, :][:j + 1, :][:, mask][:, :j + 1]
+            mrot_det = np.linalg.det(mrot)
+            if mrot_det < 0:
+                mask0 = np.arange(len(mask), dtype=int)[mask][j]
+                rot[:, mask0] = -rot[:, mask0]
+    nat_coeff = np.einsum('...pi,...ij->...pj', mc.mo_coeff, rot, optimize=True)
+    print('nat occ =', nat_occ)
+    print('nat orb_sym =', orb_sym)
+    np.save("nat_coeff.npy", nat_coeff)
+    np.save("nat_occ.npy", nat_occ)
+    np.save("nat_orb_sym.npy", orb_sym)
 """
 
 @handle_io_error
@@ -224,7 +266,7 @@ def write(fn, pmc, pmf):
             f.write("spin = None\n")
 
         f.write(MF_LOAD % (lde + "/mf.chk", mme))
-        
+
         if "max_memory" in pmc:
             f.write("mf.max_memory = %s\n" % pmc["max_memory"])
 
@@ -233,6 +275,12 @@ def write(fn, pmc, pmf):
 
         if "do_spin_square" in pmc:
             f.write("do_spin_square = True\n")
+
+        if "nat_with_pg" in pmc:
+            f.write("nat_with_pg = True\n")
+
+        if "save_amps" in pmc:
+            f.write("save_amps = True\n")
 
         if "KS" in mme:
             if "U" in mme:

@@ -28,130 +28,142 @@ def lowdin(s):
     return np.dot(v / np.sqrt(e), v.T.conj())
 
 def loc(mol, mocoeff, tol=1E-6, maxcycle=1000, iop=0):
-   part = {}
-   for iatom in range(mol.natm):
-      part[iatom] = []
-   ncgto = 0
-   for binfo in mol._bas:
-      atom_id = binfo[0]
-      lang = binfo[1]
-      ncntr = binfo[3]
-      nbas = ncntr * (2 * lang + 1)
-      part[atom_id] += range(ncgto, ncgto + nbas)
-      ncgto += nbas
-   partition = []
-   for iatom in range(mol.natm):
-      partition.append(part[iatom])
-   ova = mol.intor_symmetric("cint1e_ovlp_sph")
-   print()
-   print('[pm_loc_kernel]')
-   print(' mocoeff.shape=',mocoeff.shape)
-   print(' tol=',tol)
-   print(' maxcycle=',maxcycle)
-   print(' partition=',len(partition),'\\n',partition)
-   k = mocoeff.shape[0]
-   n = mocoeff.shape[1]
-   natom = len(partition)
+    part = {}
+    for iatom in range(mol.natm):
+        part[iatom] = []
+    ncgto = 0
+    for binfo in mol._bas:
+        atom_id = binfo[0]
+        lang = binfo[1]
+        ncntr = binfo[3]
+        nbas = ncntr * (2 * lang + 1)
+        part[atom_id] += range(ncgto, ncgto + nbas)
+        ncgto += nbas
+    partition = []
+    for iatom in range(mol.natm):
+        partition.append(part[iatom])
+    ova = mol.intor_symmetric("cint1e_ovlp_sph")
+    print()
+    print('[pm_loc_kernel]')
+    print(' mocoeff.shape=',mocoeff.shape)
+    print(' tol=',tol)
+    print(' maxcycle=',maxcycle)
+    print(' partition=',len(partition),'\\n',partition)
+    k = mocoeff.shape[0]
+    n = mocoeff.shape[1]
+    natom = len(partition)
+ 
+    def genPaij(mol,mocoeff,ova,partition,iop):
+        c = mocoeff.copy()
+        # Mulliken matrix
+        if iop == 0:
+            cts = c.T.dot(ova)
+            natom = len(partition)
+            pija = np.zeros((natom,n,n))
+            for iatom in range(natom):
+                idx = partition[iatom]
+                tmp = np.dot(cts[:,idx],c[idx,:])
+                pija[iatom] = 0.5*(tmp+tmp.T)
+        # Lowdin
+        elif iop == 1:
+            s12 = sqrtm(ova)
+            s12c = s12.T.dot(c)
+            natom = len(partition)
+            pija = np.zeros((natom,n,n))
+            for iatom in range(natom):
+                idx = partition[iatom]
+                pija[iatom] = np.dot(s12c[idx,:].T,s12c[idx,:])
+        # Boys
+        elif iop == 2:
+            rmat = mol.intor_symmetric('cint1e_r_sph',3)
+            pija = np.zeros((3,n,n))
+            for icart in range(3):
+                pija[icart] = c.T @ rmat[icart] @ c
+        # P[i,j,a]
+        pija = pija.transpose(1,2,0).copy()
+        return pija
+ 
+    u = np.identity(n)
+    pija = genPaij(mol,mocoeff,ova,partition,iop)
+ 
+    # Start
+    def funval(pija):
+        return np.einsum('iia,iia',pija,pija)
+ 
+    fun = funval(pija)
+    print(' initial funval = ',fun)
+    for icycle in range(maxcycle):
+        delta = 0.0
+        # i>j
+        ijdx = []
+        for i in range(n-1):
+            for j in range(i+1,n):
+                bij = abs(np.sum(pija[i,j]*(pija[i,i]-pija[j,j])))
+                ijdx.append((i,j,bij))
+        ijdx = sorted(ijdx,key=lambda x:x[2], reverse=True)
+        for i,j,bij in ijdx:
+            # determine angle
+            vij = pija[i,i]-pija[j,j]
+            aij = np.dot(pija[i,j],pija[i,j]) - 0.25*np.dot(vij,vij)
+            bij = np.dot(pija[i,j],vij)
+            if abs(aij)<1.e-10 and abs(bij)<1.e-10: continue
+            p1 = np.sqrt(aij**2+bij**2)
+            cos4a = -aij/p1
+            sin4a = bij/p1
+            cos2a = np.sqrt((1+cos4a)*0.5)
+            sin2a = np.sqrt((1-cos4a)*0.5)
+            cosa  = np.sqrt((1+cos2a)*0.5)
+            sina  = np.sqrt((1-cos2a)*0.5)
+            # Why? Because we require alpha in [0,pi/2]
+            if sin4a < 0.0:
+                cos2a = -cos2a
+                sina, cosa = cosa, sina
+            # stationary condition
+            if abs(cosa-1.0)<1.e-10: continue
+            if abs(sina-1.0)<1.e-10: continue
+            # incremental value
+            delta += p1*(1-cos4a)
+            # Transformation
+            # Urot
+            ui = u[:,i]*cosa+u[:,j]*sina
+            uj = -u[:,i]*sina+u[:,j]*cosa
+            u[:,i] = ui.copy()
+            u[:,j] = uj.copy()
+            # Bra-transformation of Integrals
+            tmp_ip = pija[i,:,:]*cosa+pija[j,:,:]*sina
+            tmp_jp = -pija[i,:,:]*sina+pija[j,:,:]*cosa
+            pija[i,:,:] = tmp_ip.copy()
+            pija[j,:,:] = tmp_jp.copy()
+            # Ket-transformation of Integrals
+            tmp_ip = pija[:,i,:]*cosa+pija[:,j,:]*sina
+            tmp_jp = -pija[:,i,:]*sina+pija[:,j,:]*cosa
+            pija[:,i,:] = tmp_ip.copy()
+            pija[:,j,:] = tmp_jp.copy()
+        fun = fun+delta
+        print('icycle=', icycle, 'delta=', delta, 'fun=', fun)
+        if delta < tol:
+            break
 
-   def genPaij(mol,mocoeff,ova,partition,iop):
-      c = mocoeff.copy()
-      # Mulliken matrix
-      if iop == 0:
-         cts = c.T.dot(ova)
-         natom = len(partition)
-         pija = np.zeros((natom,n,n))
-         for iatom in range(natom):
-            idx = partition[iatom]
-            tmp = np.dot(cts[:,idx],c[idx,:])
-            pija[iatom] = 0.5*(tmp+tmp.T)
-      # Lowdin
-      elif iop == 1:
-         s12 = sqrtm(ova)
-         s12c = s12.T.dot(c)
-         natom = len(partition)
-         pija = np.zeros((natom,n,n))
-         for iatom in range(natom):
-            idx = partition[iatom]
-            pija[iatom] = np.dot(s12c[idx,:].T,s12c[idx,:])
-      # Boys
-      elif iop == 2:
-         rmat = mol.intor_symmetric('cint1e_r_sph',3)
-         pija = np.zeros((3,n,n))
-         for icart in range(3):
-            pija[icart] = c.T @ rmat[icart] @ c
-      # P[i,j,a]
-      pija = pija.transpose(1,2,0).copy()
-      return pija
+    # Check
+    ierr = 0
+    if delta < tol: 
+        print('CONG: PMloc converged!')
+    else:
+        ierr = 1
+        print('WARNING: PMloc not converged')
+    return ierr, u
 
-   u = np.identity(n)
-   pija = genPaij(mol,mocoeff,ova,partition,iop)
+def loc_pg(mol, mocoeff, orb_sym):
+    assert mocoeff.shape[1] == len(orb_sym)
+    ierr = 0
+    ru = np.zeros((len(orb_sym), len(orb_sym)), dtype=mocoeff.dtype)
+    for isym in set(orb_sym):
+        mask = np.array(orb_sym) == isym
+        jerr, u = loc(mol, mocoeff[:, mask])
+        ru[np.outer(mask, mask)] = u.flatten()
+        ierr = ierr | jerr
+    return ierr, ru
 
-   # Start
-   def funval(pija):
-      return np.einsum('iia,iia',pija,pija)
-
-   fun = funval(pija)
-   print(' initial funval = ',fun)
-   for icycle in range(maxcycle):
-      delta = 0.0
-      # i>j
-      ijdx = []
-      for i in range(n-1):
-         for j in range(i+1,n):
-            bij = abs(np.sum(pija[i,j]*(pija[i,i]-pija[j,j])))
-            ijdx.append((i,j,bij))
-      ijdx = sorted(ijdx,key=lambda x:x[2], reverse=True)
-      for i,j,bij in ijdx:
-         # determine angle
-         vij = pija[i,i]-pija[j,j] 
-         aij = np.dot(pija[i,j],pija[i,j]) - 0.25*np.dot(vij,vij)
-         bij = np.dot(pija[i,j],vij)
-         if abs(aij)<1.e-10 and abs(bij)<1.e-10: continue
-         p1 = np.sqrt(aij**2+bij**2)
-         cos4a = -aij/p1
-         sin4a = bij/p1
-         cos2a = np.sqrt((1+cos4a)*0.5)
-         sin2a = np.sqrt((1-cos4a)*0.5)
-         cosa  = np.sqrt((1+cos2a)*0.5)
-         sina  = np.sqrt((1-cos2a)*0.5)
-         # Why? Because we require alpha in [0,pi/2]
-         if sin4a < 0.0:
-            cos2a = -cos2a
-            sina, cosa = cosa, sina
-         # stationary condition
-         if abs(cosa-1.0)<1.e-10: continue
-         if abs(sina-1.0)<1.e-10: continue
-         # incremental value
-         delta += p1*(1-cos4a)
-         # Transformation
-         # Urot
-         ui = u[:,i]*cosa+u[:,j]*sina
-         uj = -u[:,i]*sina+u[:,j]*cosa
-         u[:,i] = ui.copy() 
-         u[:,j] = uj.copy()
-         # Bra-transformation of Integrals
-         tmp_ip = pija[i,:,:]*cosa+pija[j,:,:]*sina
-         tmp_jp = -pija[i,:,:]*sina+pija[j,:,:]*cosa
-         pija[i,:,:] = tmp_ip.copy() 
-         pija[j,:,:] = tmp_jp.copy()
-         # Ket-transformation of Integrals
-         tmp_ip = pija[:,i,:]*cosa+pija[:,j,:]*sina
-         tmp_jp = -pija[:,i,:]*sina+pija[:,j,:]*cosa
-         pija[:,i,:] = tmp_ip.copy()
-         pija[:,j,:] = tmp_jp.copy()
-      fun = fun+delta
-      print('icycle=', icycle, 'delta=', delta, 'fun=', fun)
-      if delta < tol:
-          break
-   
-   # Check 
-   ierr = 0
-   if delta < tol: 
-      print('CONG: PMloc converged!')
-   else:
-      ierr = 1
-      print('WARNING: PMloc not converged')
-   return ierr, u
 """
 
 ACT = """

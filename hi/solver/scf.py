@@ -2,6 +2,9 @@
 from .mol import TIME_ST, TIME_ED, MOL, MOL_FINAL
 
 MF = """
+
+print("PG = ", mol.groupname)
+
 mf = %s
 mf.chkfile = 'mf.chk'
 mf.conv_tol = %s
@@ -90,6 +93,12 @@ def write(fn, pmf):
 
         if "cart" in pmf:
             f.write("mol.cart = True\n")
+
+        if "pg" in pmf:
+            if pmf["pg"] == "True":
+                f.write("mol.symmetry = True\n")
+            else:
+                f.write("mol.symmetry = \"%s\"\n" % pmf["pg"])
 
         if "dftd3" in pmf:
             f.write("from pyscf import dftd3\n")

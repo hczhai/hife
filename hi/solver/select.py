@@ -3,7 +3,7 @@ from .mol import TIME_ST, TIME_ED
 from .active import PM_LOC
 
 MF_LOAD = """
-from pyscf import scf
+from pyscf import scf, symm
 import numpy as np
 mfchk = "%s"
 mol, mfx = scf.chkfile.load_scf(mfchk)
@@ -36,6 +36,7 @@ alpha = False
 beta = False
 uno = False
 average_occ = False
+loc_with_pg = False
 """
 
 SELECT = """
@@ -136,15 +137,17 @@ elif uno:
 
 SELECT2 = """
 
-def psort(ova, fav, pT, coeff):
-   pTnew = 2.0 * (coeff.T @ ova @ pT @ ova @ coeff)
-   nocc  = np.diag(pTnew)
-   index = np.argsort(-nocc)
-   ncoeff = coeff[:, index]
-   nocc = nocc[index]
-   enorb = np.diag(coeff.T @ ova @ fav @ ova @ coeff)
-   enorb = enorb[index]
-   return ncoeff, nocc, enorb
+def psort(ova, fav, pT, coeff, orb_sym=None):
+    pTnew = 2.0 * (coeff.T @ ova @ pT @ ova @ coeff)
+    nocc  = np.diag(pTnew)
+    index = np.argsort(-nocc)
+    ncoeff = coeff[:, index]
+    nocc = nocc[index]
+    enorb = np.diag(coeff.T @ ova @ fav @ ova @ coeff)
+    enorb = enorb[index]
+    if orb_sym is not None:
+        orb_sym = orb_sym[index]
+    return ncoeff, nocc, enorb, orb_sym
 
 if cas_list is None:
     assert nactorb is not None
@@ -154,15 +157,29 @@ if cas_list is None:
 
 print('cas list = ', cas_list)
 
+orb_sym = None
+if loc_with_pg:
+    orb_sym = symm.label_orb_symm(mol, mol.irrep_name, mol.symm_orb, coeff, tol=1e-2)
+    orb_sym = np.array([symm.irrep_name2id(mol.groupname, ir) for ir in orb_sym])
+
 if split_low == 0.0 and split_high == 0.0:
 
     print('simple localization')
 
     actmo = coeff[:, np.array(cas_list, dtype=int)]
     if do_loc:
-        ierr, ua = loc(mol, actmo)
-        actmo = actmo.dot(ua)
-    actmo, actocc, e_o = psort(ova, fav, pav, actmo)
+        if not loc_with_pg:
+            ierr, ua = loc(mol, actmo)
+            actmo = actmo.dot(ua)
+        else:
+            act_orb_sym = orb_sym[np.array(cas_list, dtype=int)]
+            ierr, ua = loc_pg(mol, actmo, act_orb_sym)
+            actmo = actmo.dot(ua)
+    if not loc_with_pg:
+        actmo, actocc, e_o, _ = psort(ova, fav, pav, actmo, None)
+    else:
+        act_orb_sym = orb_sym[np.array(cas_list, dtype=int)]
+        actmo, actocc, e_o, act_orb_sym = psort(ova, fav, pav, actmo, act_orb_sym)
 
 else:
 
@@ -170,6 +187,8 @@ else:
     assert do_loc
     assert split_high >= split_low
     actmo = coeff[:, np.array(cas_list, dtype=int)]
+    if loc_with_pg:
+        act_orb_sym = orb_sym[np.array(cas_list, dtype=int)]
     actocc = mo_occ[np.array(cas_list, dtype=int)]
     print('active occ = ', np.sum(actocc, axis=-1), actocc)
     lidx = actocc <= split_low
@@ -178,24 +197,42 @@ else:
 
     if len(actmo[:, lidx]) != 0:
         print('low orbs = ', np.array(list(range(len(lidx))))[lidx])
-        ierr, ua = loc(mol, actmo[:, lidx])
-        actmo[:, lidx] = actmo[:, lidx].dot(ua)
-        actmo[:, lidx], actocc[lidx], _ = psort(ova, fav, pav, actmo[:, lidx])
+        if not loc_with_pg:
+            ierr, ua = loc(mol, actmo[:, lidx])
+            actmo[:, lidx] = actmo[:, lidx].dot(ua)
+            actmo[:, lidx], actocc[lidx], _, _ = psort(ova, fav, pav, actmo[:, lidx], None)
+        else:
+            ierr, ua = loc_pg(mol, actmo[:, lidx], act_orb_sym[lidx])
+            actmo[:, lidx] = actmo[:, lidx].dot(ua)
+            actmo[:, lidx], actocc[lidx], _, act_orb_sym[lidx] = psort(ova, fav, pav, actmo[:, lidx], act_orb_sym[lidx])
 
     if len(actmo[:, midx]) != 0:
         print('mid orbs = ', np.array(list(range(len(midx))))[midx])
-        ierr, ua = loc(mol, actmo[:, midx])
-        actmo[:, midx] = actmo[:, midx].dot(ua)
-        actmo[:, midx], actocc[midx], _ = psort(ova, fav, pav, actmo[:, midx])
+        if not loc_with_pg:
+            ierr, ua = loc(mol, actmo[:, midx])
+            actmo[:, midx] = actmo[:, midx].dot(ua)
+            actmo[:, midx], actocc[midx], _, _ = psort(ova, fav, pav, actmo[:, midx])
+        else:
+            ierr, ua = loc_pg(mol, actmo[:, midx], act_orb_sym[midx])
+            actmo[:, midx] = actmo[:, midx].dot(ua)
+            actmo[:, midx], actocc[midx], _, act_orb_sym[midx] = psort(ova, fav, pav, actmo[:, midx], act_orb_sym[midx])
+
 
     if len(actmo[:, hidx]) != 0:
         print('high orbs = ', np.array(list(range(len(hidx))))[hidx])
-        ierr, ua = loc(mol, actmo[:, hidx])
-        actmo[:, hidx] = actmo[:, hidx].dot(ua)
-        actmo[:, hidx], actocc[hidx], _ = psort(ova, fav, pav, actmo[:, hidx])
+        if not loc_with_pg:
+            ierr, ua = loc(mol, actmo[:, hidx])
+            actmo[:, hidx] = actmo[:, hidx].dot(ua)
+            actmo[:, hidx], actocc[hidx], _, _ = psort(ova, fav, pav, actmo[:, hidx])
+        else:
+            ierr, ua = loc_pg(mol, actmo[:, hidx], act_orb_sym[hidx])
+            actmo[:, hidx] = actmo[:, hidx].dot(ua)
+            actmo[:, hidx], actocc[hidx], _, act_orb_sym[hidx] = psort(ova, fav, pav, actmo[:, hidx], act_orb_sym[hidx])
 
 coeff[:, np.array(sorted(cas_list), dtype=int)] = actmo
 mo_occ[np.array(sorted(cas_list), dtype=int)] = actocc
+if loc_with_pg:
+    orb_sym[np.array(sorted(cas_list), dtype=int)] = act_orb_sym
 
 # sort_mo from pyscf.mcscf.addons
 
@@ -209,11 +246,17 @@ assert (mol.nelectron - nactelec) % 2 == 0
 ncore = (mol.nelectron - nactelec) // 2
 print("NACTORB = %d NACTELEC = %d NCORE = %d" % (nactorb, nactelec, ncore))
 coeff = np.hstack((coeff[:, idx[:ncore]], coeff[:, cas_list], coeff[:, idx[ncore:]]))
+print('lo occ =', mo_occ[cas_list])
 mo_occ = np.hstack((mo_occ[idx[:ncore]], mo_occ[cas_list], mo_occ[idx[ncore:]]))
+if loc_with_pg:
+    print('loc orb_sym =', orb_sym[cas_list])
+    orb_sym = np.hstack((orb_sym[idx[:ncore]], orb_sym[cas_list], orb_sym[idx[ncore:]]))
 
 np.save("lo_coeff.npy", coeff)
 np.save("lo_occ.npy", mo_occ)
 np.save("active_space.npy", (nactorb, nactelec))
+if loc_with_pg:
+    np.save("lo_orb_sym.npy", orb_sym)
 """
 
 def write(fn, pma):
@@ -260,6 +303,9 @@ def write(fn, pma):
 
         if "average_occ" in pma:
             f.write("average_occ = True\n")
+
+        if "loc_with_pg" in pma:
+            f.write("loc_with_pg = True\n")
 
         f.write("do_loc = %s\n" % (False if "no_loc" in pma else True))
 

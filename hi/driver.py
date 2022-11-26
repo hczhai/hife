@@ -213,7 +213,7 @@ class HFDriver(BaseDriver):
         optl = [ "smearing", "smearing_conv_tol", "x2c", "dftd3",
             "smearing_method", "smearing_max_cycle", "newton_max_cycle",
             "dimer_init", "dimer_spin", "dimer_type", "direct_newton",
-            "newton_conv", "ecp" ] + list(opts.keys())
+            "newton_conv", "ecp", "pg" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage" ]:
             if k not in opts:
@@ -243,7 +243,8 @@ class HFDriver(BaseDriver):
             "max_cycle": "1000",
         }
         optl = [ "load_mf", "load_coeff", "do_spin_square",
-            "frozen", "spin", "max_memory", "non_canonical" ] + list(opts.keys())
+            "frozen", "spin", "max_memory", "non_canonical",
+            "nat_with_pg", "save_amps" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
@@ -275,7 +276,8 @@ class HFDriver(BaseDriver):
             "bcc_max_cycle": 10
         }
         optl = [ "load_mf", "load_coeff", "level_shift", "no_ccsd_t",
-            "do_spin_square", "frozen", "spin", "bcc", "max_memory" ] + list(opts.keys())
+            "do_spin_square", "frozen", "spin", "bcc", "max_memory",
+            "nat_with_pg", "save_amps" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
@@ -354,7 +356,7 @@ class HFDriver(BaseDriver):
         opts = {}
         optl = [ "load_mf", "load_coeff", "no_loc", "cas_list",
             "nactorb", "nactelec", "split_low", "split_high",
-            "alpha", "beta", "uno", "average_occ" ] + list(opts.keys())
+            "alpha", "beta", "uno", "average_occ", "loc_with_pg" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
