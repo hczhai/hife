@@ -646,7 +646,7 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude", "restart", "reservation", "pyscf-path",
+        optl = [ "exclude", "restart", "reservation", "pyscf-path", "block2-path",
             "block2-dmrg", "block2-dmrg-rev", "block2-dmrg-csf" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
@@ -670,6 +670,10 @@ class HFDriver(BaseDriver):
         if "pyscf-path" in opts:
             cmd = "sed -i '/which python3/a \\export PYTHONPATH=%s:$PYTHONPATH' %s" % (
                 opts["pyscf-path"].replace("/", "\\/"), l)
+            print(os.popen(cmd).read().strip())
+        if "block2-path" in opts:
+            cmd = "sed -i '/which python3/a \\export PYTHONPATH=%s:$PYTHONPATH' %s" % (
+                opts["block2-path"].replace("/", "\\/"), l)
             print(os.popen(cmd).read().strip())
         cmd = '%s \"%s\"' % (jcmd[0], l)
         print("%s %s/%s" % ("submit", sec_key, l))
