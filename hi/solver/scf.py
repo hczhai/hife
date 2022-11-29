@@ -75,7 +75,10 @@ def write(fn, pmf):
 
         f.write(TIME_ST)
 
-        gemo = open(pmf["geometry"]).readlines()
+        if isinstance(pmf["geometry"], list):
+            gemo = pmf["geometry"]
+        else:
+            gemo = open(pmf["geometry"]).readlines()
         assert int(gemo[0]) == len(gemo) - 2
 
         f.write(MOL % (

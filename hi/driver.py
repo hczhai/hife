@@ -106,7 +106,8 @@ class HFDriver(BaseDriver):
         super().__init__(argv)
         self.tasks = ["init", "show", "clean", "mf", "cc", "mp",
             "set", "create", "submit", "log", "act", "orb",
-            "ex", "select", "casci", "casscf", "mrpt", "avas"]
+            "ex", "select", "casci", "casscf", "mrpt", "avas",
+            "stdmrg"]
 
     def run(self):
         super().run()
@@ -221,7 +222,13 @@ class HFDriver(BaseDriver):
         sec_key = "mf-%s" % opts["stage"]
         if sec_key in pre:
             raise RuntimeError("key %s already used!" % sec_key)
-        if os.path.isfile(lr[0] + "/" + opts["geometry"]):
+        if ":dimer:" in opts["geometry"]:
+            elem, _, rr = opts["geometry"].split('.xyz')[0].split(':') # def unit is ang
+            elem = elem[0].upper() + elem[1:]
+            geom = open(self.structures_dir + "/dimer.xyz", "r").read()
+            geom = geom % (elem, -float(rr) / 2, elem, float(rr) / 2)
+            geom = [x + '\n' for x in geom.split('\n')]
+        elif os.path.isfile(lr[0] + "/" + opts["geometry"]):
             geom = lr[0] + "/" + opts["geometry"]
         elif os.path.isfile(self.structures_dir + "/" + opts["geometry"]):
             geom = self.structures_dir + "/" + opts["geometry"]
@@ -232,6 +239,39 @@ class HFDriver(BaseDriver):
             if k in opts:
                 pre[sec_key][k] = opts[k]
         pre[sec_key]["geometry"] = geom
+        write_json(pre, "./hife-parameters.json")
+
+    def stdmrg(self, args):
+        """ST-DMRG calculation."""
+        pre = self.pre_info()
+        self.to_dir(dox="local")
+        def_pos = { "0": "stage" }
+        opts = { "frozen": "0", "max_cycle": "1000" }
+        optl = [ "load_mf", "load_coeff", "load_amps",
+            "spin", "max_memory", "ncore", "ncas", "from_mp2",
+            "xcc_nelec", "xcc_ncas", "st_type" ] + list(opts.keys())
+        opts.update(read_opts(args, def_pos, optl))
+        for k in [ "stage", "load_mf" ]:
+            if k not in opts:
+                raise RuntimeError("no %s argument found!" % k)
+        sec_key = "stdmrg-%s" % opts["stage"]
+        if sec_key in pre:
+            raise RuntimeError("key %s already used!" % sec_key)
+        if opts["load_mf"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_mf"])
+        if "load_coeff" in opts and opts["load_coeff"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_coeff"])
+        if "load_amps" in opts and opts["load_amps"] not in pre:
+            raise RuntimeError("%s not found!" % opts["load_amps"])
+        pre[sec_key] = {}
+        for k in optl:
+            if k in opts:
+                pre[sec_key][k] = opts[k]
+        print("%s mol based on %s" % (sec_key, pre[sec_key]["load_mf"]))
+        if "load_coeff" in opts:
+            print("%s orb based on %s" % (sec_key, pre[sec_key]["load_coeff"]))
+        if "load_amps" in opts:
+            print("%s amps based on %s" % (sec_key, pre[sec_key]["load_amps"]))
         write_json(pre, "./hife-parameters.json")
 
     def mp(self, args):
@@ -277,7 +317,7 @@ class HFDriver(BaseDriver):
         }
         optl = [ "load_mf", "load_coeff", "level_shift", "no_ccsd_t",
             "do_spin_square", "frozen", "spin", "bcc", "max_memory",
-            "nat_with_pg", "save_amps" ] + list(opts.keys())
+            "nat_with_pg", "save_amps", "xcc_nelec", "xcc_ncas" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
@@ -528,6 +568,9 @@ class HFDriver(BaseDriver):
         elif args[0] == "mp":
             from .solver.mp import write
             write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]])
+        elif args[0] == "stdmrg":
+            from .solver.stdmrg import write
+            write("%s/hife.py" % xdir, pre[sec_key], pre[pre[sec_key]["load_mf"]])
         elif args[0] == "act":
             from .solver.active import write
             write("%s/hife.py" % xdir, pre[sec_key])
@@ -603,7 +646,7 @@ class HFDriver(BaseDriver):
         self.to_dir(dox="local")
         lr = self.lr_dirs()
         opts = {}
-        optl = [ "exclude", "restart", "reservation",
+        optl = [ "exclude", "restart", "reservation", "pyscf-path",
             "block2-dmrg", "block2-dmrg-rev", "block2-dmrg-csf" ] + list(opts.keys())
         opts.update(read_opts(args[2:], {}, optl))
         sec_key = "%s-%s" % (args[0], args[1])
@@ -623,6 +666,10 @@ class HFDriver(BaseDriver):
             print(os.popen(cmd).read().strip())
         if "reservation" in opts:
             cmd = "sed -i '3 i\\#SBATCH --reservation=%s' %s" % (opts["reservation"], l)
+            print(os.popen(cmd).read().strip())
+        if "pyscf-path" in opts:
+            cmd = "sed -i '/which python3/a \\export PYTHONPATH=%s:$PYTHONPATH' %s" % (
+                opts["pyscf-path"].replace("/", "\\/"), l)
             print(os.popen(cmd).read().strip())
         cmd = '%s \"%s\"' % (jcmd[0], l)
         print("%s %s/%s" % ("submit", sec_key, l))
@@ -689,6 +736,8 @@ class HFDriver(BaseDriver):
                             extra += " nao = " + xgl.split('=')[-1].strip()
                         elif xgl.startswith("NELEC"):
                             extra += " nelec = %d" % sum([int(x) for x in xgl.split('=')[-1].strip()[1:-1].split(', ')])
+                        elif "-> CAS" in xgl:
+                            extra += " " + xgl.strip()
                         elif "converged SCF energy" in xgl:
                             ex = xgl.split("=")[1].split()[0]
                             if "<S^2> = " in xgl:
@@ -704,6 +753,10 @@ class HFDriver(BaseDriver):
                         elif xgl.startswith("ECCSD(T) ="):
                             ex += " " + " ".join(xgl.split())
                         elif xgl.startswith("EBCCSD   ="):
+                            ex += " " + " ".join(xgl.split())
+                        elif xgl.startswith("EST    ="):
+                            ex += " " + " ".join(xgl.split())
+                        elif xgl.startswith("EST(T) ="):
                             ex += " " + " ".join(xgl.split())
                         elif xgl.startswith("Time sweep ="):
                             tswp += float(xgl.split("=")[1].split()[0])
@@ -758,6 +811,8 @@ class HFDriver(BaseDriver):
             elif k.startswith("cc-"):
                 if "level_shift" in v:
                     print("[%s] :: load = %s level_shift = %s%s" % (k, v["load_mf"], v["level_shift"], extra))
+                elif "frozen" in v:
+                    print("[%s] :: load = %s frozen = %s%s" % (k, v["load_mf"], v["frozen"], extra))
                 else:
                     print("[%s] :: load = %s%s" % (k, v["load_mf"], extra))
             elif k.startswith("mp-"):
@@ -765,6 +820,8 @@ class HFDriver(BaseDriver):
                     print("[%s] :: load = %s non_canonical = T%s" % (k, v["load_mf"], extra))
                 else:
                     print("[%s] :: load = %s%s" % (k, v["load_mf"], extra))
+            elif k.startswith("stdmrg-"):
+                print("[%s] :: load = %s%s" % (k, v["load_mf"], extra))
             elif "load_mf" in v:
                 xx = "[%s] :: mf = %s" % (k, v["load_mf"])
                 if "load_coeff" in v:
@@ -828,6 +885,7 @@ class HFDriver(BaseDriver):
         if "no-scratch" not in opts and not os.path.isfile("./DIRECTORIES"):
             path_pwd = os.path.abspath(os.curdir)
             xname = opts["name"].replace("(", "").replace(")", "").replace("|", "")
+            xname = xname.replace(":", "-").replace("*", "").replace("@", "")
             xbasis = opts["basis"].replace("(", "").replace(")", "").replace("|", "")
             path_remote = "%s-%s-%s" % (xname, xbasis, opts["method"])
             path_id = 0

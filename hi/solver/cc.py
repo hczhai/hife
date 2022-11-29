@@ -1,6 +1,141 @@
 
 from .mol import TIME_ST, TIME_ED, handle_io_error
 
+XCC = """
+from pyscf.cc import rccsd, ccsd_lambda
+from pyscf.cc import uccsd, uccsd_lambda
+import numpy as np
+
+def remove_act_amps_r(cc, t1, t2):
+    if t1 is not None:
+        t1[cc.norb_start:, :cc.norb_end - len(t1)] = 0
+    t2[cc.norb_start:, cc.norb_start:, :cc.norb_end - len(t2), :cc.norb_end - len(t2)] = 0
+    return t1, t2
+
+def x_energy_rccsd(cc, t1, t2, eris):
+    t1, t2 = remove_act_amps_r(cc, t1, t2)
+    return rccsd.RCCSD.energy(cc, t1, t2, eris)
+
+def x_update_amps_rccsd(cc, t1, t2, eris):
+    t1, t2 = remove_act_amps_r(cc, t1, t2)
+    t1new, t2new = rccsd.RCCSD.update_amps(cc, t1, t2, eris)
+    t1new, t2new = remove_act_amps_r(cc, t1new, t2new)
+    return t1new, t2new
+
+def x_update_lambda_rccsd(cc, t1, t2, l1, l2, eris=None, imds=None):
+    l1, l2 = remove_act_amps_r(cc, l1, l2)
+    l1new, l2new = ccsd_lambda.update_lambda(cc, t1, t2, l1, l2, eris, imds)
+    l1new, l2new = remove_act_amps_r(cc, l1new, l2new)
+    return l1new, l2new
+
+def x_init_amps_rccsd(cc, eris):
+    emp2, t1, t2 = rccsd.RCCSD.init_amps(cc, eris)
+    t1, t2 = remove_act_amps_r(cc, t1, t2)
+    eris_ovov = np.array(eris.ovov)
+    emp2 = 2 * np.einsum('ijab,iajb', t2, eris_ovov.conj(), optimize=True).real
+    emp2 -=    np.einsum('jiab,iajb', t2, eris_ovov.conj(), optimize=True).real
+    return emp2, t1, t2
+
+def x_solve_lambda_rccsd(cc, t1=None, t2=None, l1=None, l2=None, eris=None):
+    if t1 is None: t1 = cc.t1
+    if t2 is None: t2 = cc.t2
+    if eris is None: eris = cc.ao2mo(cc.mo_coeff)
+    cc.converged_lambda, cc.l1, cc.l2 = \\
+        ccsd_lambda.kernel(cc, eris, t1, t2, l1, l2,
+                            max_cycle=cc.max_cycle,
+                            tol=cc.conv_tol_normt,
+                            verbose=cc.verbose,
+                            fupdate=x_update_lambda_rccsd)
+    return cc.l1, cc.l2
+
+class XRCCSD(rccsd.RCCSD):
+    def __init__(self, mf, nactorb, nactelec, **kwargs):
+        nce = (mf.mol.nelectron - nactelec) // 2
+        self.norb_start = nce
+        self.norb_end = self.norb_start + nactorb
+        self.nactelec = nactelec
+        self.nactorb = nactorb
+        rccsd.RCCSD.__init__(self, mf, **kwargs)
+    energy = x_energy_rccsd
+    update_amps = x_update_amps_rccsd
+    init_amps = x_init_amps_rccsd
+    solve_lambda = x_solve_lambda_rccsd
+
+def remove_act_amps_u(cc, t1, t2):
+    if t1 is not None:
+        t1a, t1b = t1
+        lac, lbc = len(t1a), len(t1b)
+        t1a[cc.norb_start:, :cc.norb_end - lac] = 0
+        t1b[cc.norb_start:, :cc.norb_end - lbc] = 0
+        t1 = t1a, t1b
+    t2aa, t2ab, t2bb = t2
+    lac, lbc = len(t2aa), len(t2bb)
+    t2aa[cc.norb_start:, cc.norb_start:, :cc.norb_end - lac, :cc.norb_end - lac] = 0
+    t2ab[cc.norb_start:, cc.norb_start:, :cc.norb_end - lac, :cc.norb_end - lbc] = 0
+    t2bb[cc.norb_start:, cc.norb_start:, :cc.norb_end - lbc, :cc.norb_end - lbc] = 0
+    t2 = t2aa, t2ab, t2bb
+    return t1, t2
+
+def x_energy_uccsd(cc, t1, t2, eris):
+    t1, t2 = remove_act_amps_u(cc, t1, t2)
+    return uccsd.UCCSD.energy(cc, t1, t2, eris)
+
+def x_update_amps_uccsd(cc, t1, t2, eris):
+    t1, t2 = remove_act_amps_u(cc, t1, t2)
+    t1new, t2new = uccsd.UCCSD.update_amps(cc, t1, t2, eris)
+    t1new, t2new = remove_act_amps_u(cc, t1new, t2new)
+    return t1new, t2new
+
+def x_update_lambda_uccsd(cc, t1, t2, l1, l2, eris=None, imds=None):
+    l1, l2 = remove_act_amps_u(cc, l1, l2)
+    l1new, l2new = uccsd_lambda.update_lambda(cc, t1, t2, l1, l2, eris, imds)
+    l1new, l2new = remove_act_amps_u(cc, l1new, l2new)
+    return l1new, l2new
+
+def x_init_amps_uccsd(cc, eris):
+    emp2, t1, t2 = uccsd.UCCSD.init_amps(cc, eris)
+    t1, t2 = remove_act_amps_u(cc, t1, t2)
+    eris_ovov = np.asarray(eris.ovov)
+    eris_OVOV = np.asarray(eris.OVOV)
+    eris_ovOV = np.asarray(eris.ovOV)
+    t2aa, t2ab, t2bb = t2
+    e  =      np.einsum('iJaB,iaJB', t2ab, eris_ovOV, optimize=True)
+    e += 0.25*np.einsum('ijab,iajb', t2aa, eris_ovov, optimize=True)
+    e -= 0.25*np.einsum('ijab,ibja', t2aa, eris_ovov, optimize=True)
+    e += 0.25*np.einsum('ijab,iajb', t2bb, eris_OVOV, optimize=True)
+    e -= 0.25*np.einsum('ijab,ibja', t2bb, eris_OVOV, optimize=True)
+    emp2 = e.real
+    return emp2, t1, t2
+
+def x_solve_lambda_uccsd(cc, t1=None, t2=None, l1=None, l2=None, eris=None):
+    if t1 is None: t1 = cc.t1
+    if t2 is None: t2 = cc.t2
+    if eris is None: eris = cc.ao2mo(cc.mo_coeff)
+    cc.converged_lambda, cc.l1, cc.l2 = \\
+        ccsd_lambda.kernel(cc, eris, t1, t2, l1, l2,
+                            max_cycle=cc.max_cycle,
+                            tol=cc.conv_tol_normt,
+                            verbose=cc.verbose,
+                            fintermediates=uccsd_lambda.make_intermediates,
+                            fupdate=x_update_lambda_uccsd)
+    return cc.l1, cc.l2
+    
+class XUCCSD(uccsd.UCCSD):
+    def __init__(self, mf, nactorb, nactelec, **kwargs):
+        if not isinstance(nactelec, tuple):
+            nactelec = nactelec - nactelec // 2, nactelec // 2
+        nae = nactelec[0] + nactelec[1]
+        nce = mf.mol.nelectron - nae
+        self.norb_start = nce // 2
+        self.norb_end = self.norb_start + nactorb
+        self.nactelec = nactelec
+        uccsd.UCCSD.__init__(self, mf, **kwargs)
+    energy = x_energy_uccsd
+    update_amps = x_update_amps_uccsd
+    init_amps = x_init_amps_uccsd
+    solve_lambda = x_solve_lambda_uccsd
+"""
+
 MF_LOAD = """
 from pyscf import scf, lib, symm
 import numpy as np
@@ -20,6 +155,8 @@ bcc = False
 do_spin_square = False
 nat_with_pg = False
 save_amps = False
+xcc_nelec = None
+xcc_ncas = None
 """
 
 CC_LOAD_COEFF = """
@@ -68,7 +205,17 @@ CC = """
 print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
 
 from pyscf import cc
-mc = cc.CCSD(mf)
+
+if xcc_ncas is not None:
+    if isinstance(mf, scf.uhf.UHF):
+        xna = (xcc_nelec + spin) // 2
+        xnb = (xcc_nelec - spin) // 2
+        mc = XUCCSD(mf, xcc_ncas, (xna, xnb))
+    else:
+        mc = XRCCSD(mf, xcc_ncas, xcc_nelec)
+else:
+    mc = cc.CCSD(mf)
+
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
 """
@@ -76,8 +223,18 @@ mc.max_cycle = %s
 CC_FROZEN = """
 print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
 
-from pyscf import cc
-mc = cc.CCSD(mf, frozen=%s)
+from pyscf import cc, scf
+
+nfrozen = %s
+if xcc_ncas is not None:
+    if isinstance(mf, scf.uhf.UHF):
+        xna = (xcc_nelec + spin) // 2
+        xnb = (xcc_nelec - spin) // 2
+        mc = XUCCSD(mf, xcc_ncas, (xna, xnb), frozen=nfrozen)
+    else:
+        mc = XRCCSD(mf, xcc_ncas, xcc_nelec, frozen=nfrozen)
+else:
+    mc = cc.CCSD(mf, frozen=nfrozen)
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
 """
@@ -307,6 +464,14 @@ def write(fn, pmc, pmf):
             f.write("bcc = True\n")
             f.write("bcc_conv_tol = %s\n" % pmc["bcc_conv_tol"])
             f.write("bcc_max_cycle = %s\n" % pmc["bcc_max_cycle"])
+
+        if "xcc_nelec" in pmc or "xcc_ncas" in pmc:
+            f.write(XCC)
+
+        if "xcc_ncas" in pmc:
+            f.write("xcc_ncas = %s\n" % pmc["xcc_ncas"])
+        if "xcc_nelec" in pmc:
+            f.write("xcc_nelec = %s\n" % pmc["xcc_nelec"])
 
         f.write(CC_PRE)
 
