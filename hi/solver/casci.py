@@ -18,9 +18,9 @@ def semi_canon(mf):
     print('doing semi canonicalization ...')
 
     if isinstance(mf, scf.uhf.UHF):
-        ma, mb = coeff
-        nocca = len(mo_occ[0][mo_occ[0] > 0])
-        noccb = len(mo_occ[1][mo_occ[1] > 0])
+        ma, mb = mf.coeff
+        nocca = len(mf.mo_occ[0][mf.mo_occ[0] > 0])
+        noccb = len(mf.mo_occ[1][mf.mo_occ[1] > 0])
 
         fockao_a = mf.get_fock()[0]
         fockmo_a = ma.T @ fockao_a @ ma
@@ -41,13 +41,13 @@ def semi_canon(mf):
         mf.mo_coeff = np.array([mo_coeff_a, mo_coeff_b])
 
     elif isinstance(mf, scf.rhf.RHF):
-        nocc = len(mo_occ[mo_occ > 0])
+        nocc = len(mf.mo_occ[mf.mo_occ > 0])
         fockao = mf.get_fock()
-        fockmo = coeff.T @ fockao @ coeff
+        fockmo = mf.coeff.T @ fockao @ mf.coeff
         foo = fockmo[:nocc, :nocc]
         fvv = fockmo[nocc:, nocc:]
-        mo_coeff_occ = np.dot(coeff[:, :nocc], np.linalg.eigh(foo)[1])
-        mo_coeff_vir = np.dot(coeff[:, nocc:], np.linalg.eigh(fvv)[1])
+        mo_coeff_occ = np.dot(mf.coeff[:, :nocc], np.linalg.eigh(foo)[1])
+        mo_coeff_vir = np.dot(mf.coeff[:, nocc:], np.linalg.eigh(fvv)[1])
         mf.mo_coeff = np.concatenate((mo_coeff_occ, mo_coeff_vir), axis=1)
     else:
         assert False
