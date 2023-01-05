@@ -163,7 +163,7 @@ SEMI_CANON = """
 print('doing semi canonicalization ...')
 
 if isinstance(mf, scf.uhf.UHF):
-    ma, mb = mf.coeff
+    ma, mb = mf.mo_coeff
     nocca = len(mf.mo_occ[0][mf.mo_occ[0] > 0])
     noccb = len(mf.mo_occ[1][mf.mo_occ[1] > 0])
 
@@ -188,11 +188,11 @@ if isinstance(mf, scf.uhf.UHF):
 elif isinstance(mf, scf.rhf.RHF):
     nocc = len(mf.mo_occ[mf.mo_occ > 0])
     fockao = mf.get_fock()
-    fockmo = mf.coeff.T @ fockao @ mf.coeff
+    fockmo = mf.mo_coeff.T @ fockao @ mf.mo_coeff
     foo = fockmo[:nocc, :nocc]
     fvv = fockmo[nocc:, nocc:]
-    mo_coeff_occ = np.dot(mf.coeff[:, :nocc], np.linalg.eigh(foo)[1])
-    mo_coeff_vir = np.dot(mf.coeff[:, nocc:], np.linalg.eigh(fvv)[1])
+    mo_coeff_occ = np.dot(mf.mo_coeff[:, :nocc], np.linalg.eigh(foo)[1])
+    mo_coeff_vir = np.dot(mf.mo_coeff[:, nocc:], np.linalg.eigh(fvv)[1])
     mf.mo_coeff = np.concatenate((mo_coeff_occ, mo_coeff_vir), axis=1)
 else:
     assert False
