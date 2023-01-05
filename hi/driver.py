@@ -465,7 +465,7 @@ class HFDriver(BaseDriver):
             "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
             "cas_ccsd", "cas_ccsd_t", "cas_uccsd", "cas_uccsd_t",
             "cas_ucc_mf_max_cycle", "cas_ucc_cc_max_cycle",
-            "nonspinadapted", "level_shift" ] + list(opts.keys())
+            "nonspinadapted", "level_shift", "cas_semi_canonical" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:

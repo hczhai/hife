@@ -164,6 +164,10 @@ class CCSolver:
             mf.mo_occ = np.zeros((2, norb))
             mf.mo_occ[0][:nelec[0]] += 1.0
             mf.mo_occ[1][:nelec[1]] += 1.0
+
+        if semi_canonical:
+            semi_canon(mf)
+
         self.cc = cc.CCSD(mf)
         self.cc.level_shift = %s
         self.cc.run()
@@ -304,7 +308,7 @@ def write(fn, pmc, pmf, is_casci=True):
 
         f.write(MF_LOAD % (lde + "/mf.chk", "x2c" in pmf, "dftd3" in pmf))
 
-        if "semi_canonical" in pmc:
+        if "cas_semi_canonical" in pmc:
             f.write("semi_canonical = True\n")
             f.write(SEMI_CANON)
 
