@@ -10,6 +10,47 @@ x2c = %s
 d3 = %s
 nactorb = None
 nactelec = None
+semi_canonical = False
+"""
+
+SEMI_CANON = """
+def semi_canon(mf):
+    print('doing semi canonicalization ...')
+
+    if isinstance(mf, scf.uhf.UHF):
+        ma, mb = coeff
+        nocca = len(mo_occ[0][mo_occ[0] > 0])
+        noccb = len(mo_occ[1][mo_occ[1] > 0])
+
+        fockao_a = mf.get_fock()[0]
+        fockmo_a = ma.T @ fockao_a @ ma
+        foo = fockmo_a[:nocca, :nocca]
+        fvv = fockmo_a[nocca:, nocca:]
+        mo_coeff_occ_a = np.dot(ma[:, :nocca], np.linalg.eigh(foo)[1])
+        mo_coeff_vir_a = np.dot(ma[:, nocca:], np.linalg.eigh(fvv)[1])
+        mo_coeff_a = np.concatenate((mo_coeff_occ_a, mo_coeff_vir_a), axis=1)
+
+        fockao_b = mf.get_fock()[1]
+        fockmo_b = mb.T @ fockao_b @ mb
+        foo = fockmo_b[:noccb, :noccb]
+        fvv = fockmo_b[noccb:, noccb:]
+        mo_coeff_occ_b = np.dot(mb[:, :noccb], np.linalg.eigh(foo)[1])
+        mo_coeff_vir_b = np.dot(mb[:, noccb:], np.linalg.eigh(fvv)[1])
+        mo_coeff_b = np.concatenate((mo_coeff_occ_b, mo_coeff_vir_b), axis=1)
+
+        mf.mo_coeff = np.array([mo_coeff_a, mo_coeff_b])
+
+    elif isinstance(mf, scf.rhf.RHF):
+        nocc = len(mo_occ[mo_occ > 0])
+        fockao = mf.get_fock()
+        fockmo = coeff.T @ fockao @ coeff
+        foo = fockmo[:nocc, :nocc]
+        fvv = fockmo[nocc:, nocc:]
+        mo_coeff_occ = np.dot(coeff[:, :nocc], np.linalg.eigh(foo)[1])
+        mo_coeff_vir = np.dot(coeff[:, nocc:], np.linalg.eigh(fvv)[1])
+        mf.mo_coeff = np.concatenate((mo_coeff_occ, mo_coeff_vir), axis=1)
+    else:
+        assert False
 """
 
 CASCI = """
@@ -167,6 +208,10 @@ class UCCSolver:
         mf.get_ovlp = lambda *args: np.identity(norb)
         mf.max_cycle = %s
         mf.kernel(dm0=self.dmcas)
+
+        if semi_canonical:
+            semi_canon(mf)
+
         self.cc = cc.UCCSD(mf)
         self.cc.level_shift = %s
         self.cc.max_cycle = %s
@@ -258,6 +303,10 @@ def write(fn, pmc, pmf, is_casci=True):
         mf_lde = lde
 
         f.write(MF_LOAD % (lde + "/mf.chk", "x2c" in pmf, "dftd3" in pmf))
+
+        if "semi_canonical" in pmc:
+            f.write("semi_canonical = True\n")
+            f.write(SEMI_CANON)
 
         lde = pmc["load_coeff"]
         if "/" not in lde:
