@@ -162,6 +162,8 @@ xcc_ncas = None
 SEMI_CANON = """
 print('doing semi canonicalization ...')
 
+nfrozen = %s
+
 if isinstance(mf, scf.uhf.UHF):
     ma, mb = mf.mo_coeff
     nocca = len(mf.mo_occ[0][mf.mo_occ[0] > 0])
@@ -169,31 +171,26 @@ if isinstance(mf, scf.uhf.UHF):
 
     fockao_a = mf.get_fock()[0]
     fockmo_a = ma.T @ fockao_a @ ma
-    foo = fockmo_a[:nocca, :nocca]
+    foo = fockmo_a[nfrozen:nocca, nfrozen:nocca]
     fvv = fockmo_a[nocca:, nocca:]
-    mo_coeff_occ_a = np.dot(ma[:, :nocca], np.linalg.eigh(foo)[1])
-    mo_coeff_vir_a = np.dot(ma[:, nocca:], np.linalg.eigh(fvv)[1])
-    mo_coeff_a = np.concatenate((mo_coeff_occ_a, mo_coeff_vir_a), axis=1)
+    mf.mo_coeff[0][:, nfrozen:nocca] = np.dot(ma[:, nfrozen:nocca], np.linalg.eigh(foo)[1])
+    mf.mo_coeff[0][:, nocca:] = np.dot(ma[:, nocca:], np.linalg.eigh(fvv)[1])
 
     fockao_b = mf.get_fock()[1]
     fockmo_b = mb.T @ fockao_b @ mb
-    foo = fockmo_b[:noccb, :noccb]
+    foo = fockmo_b[nfrozen:noccb, nfrozen:noccb]
     fvv = fockmo_b[noccb:, noccb:]
-    mo_coeff_occ_b = np.dot(mb[:, :noccb], np.linalg.eigh(foo)[1])
-    mo_coeff_vir_b = np.dot(mb[:, noccb:], np.linalg.eigh(fvv)[1])
-    mo_coeff_b = np.concatenate((mo_coeff_occ_b, mo_coeff_vir_b), axis=1)
-
-    mf.mo_coeff = np.array([mo_coeff_a, mo_coeff_b])
+    mf.mo_coeff[1][:, nfrozen:noccb] = np.dot(mb[:, nfrozen:noccb], np.linalg.eigh(foo)[1])
+    mf.mo_coeff[1][:, noccb:] = np.dot(mb[:, noccb:], np.linalg.eigh(fvv)[1])
 
 elif isinstance(mf, scf.rhf.RHF):
     nocc = len(mf.mo_occ[mf.mo_occ > 0])
     fockao = mf.get_fock()
     fockmo = mf.mo_coeff.T @ fockao @ mf.mo_coeff
-    foo = fockmo[:nocc, :nocc]
+    foo = fockmo[nfrozen:nocc, nfrozen:nocc]
     fvv = fockmo[nocc:, nocc:]
-    mo_coeff_occ = np.dot(mf.mo_coeff[:, :nocc], np.linalg.eigh(foo)[1])
-    mo_coeff_vir = np.dot(mf.mo_coeff[:, nocc:], np.linalg.eigh(fvv)[1])
-    mf.mo_coeff = np.concatenate((mo_coeff_occ, mo_coeff_vir), axis=1)
+    mf.mo_coeff[:, nfrozen:nocc] = np.dot(mf.mo_coeff[:, nfrozen:nocc], np.linalg.eigh(foo)[1])
+    mf.mo_coeff[:, nocc:] = np.dot(mf.mo_coeff[:, nocc:], np.linalg.eigh(fvv)[1])
 else:
     assert False
 """
@@ -500,7 +497,7 @@ def write(fn, pmc, pmf):
             f.write(CC_LOAD_COEFF)
 
         if "semi_canonical" in pmc:
-            f.write(SEMI_CANON)
+            f.write(SEMI_CANON % pmc.get("frozen", 0))
 
         if "bcc" in pmc:
             f.write("bcc = True\n")
