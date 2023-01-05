@@ -103,6 +103,8 @@ print('\\ncas_exclude = ', eris.cas_exclude)
 e_t_no_cas = mc.ccsd_t(eris=eris)
 
 print("E(T) = ", e_t_no_cas, '\\n')
+del mc
+del eris
 """
 
 ST_MP2 = """
@@ -114,6 +116,7 @@ mc.kernel()
 
 tt1, tt2 = mc.t1, mc.t2
 e_t_no_cas = None
+del mc
 """
 
 ST = """
@@ -123,9 +126,38 @@ from pyblock2.driver.core import STTypes, SimilarityTransform
 import numpy as np
 import os
 
-_, n_elec, spin, ecore, h1e, g2e, orb_sym = get_uhf_integrals(mf, ncore=%s)
+def fmt_size(i, suffix='B'):
+    if i < 1000:
+        return "%%d %%s" %% (i, suffix)
+    else:
+        a = 1024
+        for pf in "KMGTPEZY":
+            p = 2
+            for k in [10, 100, 1000]:
+                if i < k * a:
+                    return "%%%%.%%df %%%%s%%%%s" %% p %% (i / a, pf, suffix)
+                p -= 1
+            a *= 1024
+    return "??? " + suffix
 
+_, n_elec, spin, ecore, h1e, g2e, orb_sym = get_uhf_integrals(mf, ncore=%s)
 e_hf = mf.e_tot
+del mf
+
+try:
+    import psutil
+    mem = psutil.Process(os.getpid()).memory_info().rss
+    print("pre-st memory usage = ", fmt_size(mem))
+except ImportError:
+    pass
+
+dtotal = 0
+for k, dx in [('t1', tt1), ('t2', tt2), ('h1e', h1e), ('g2e', g2e)]:
+    for ddx in dx:
+        print(k, "data memory = ", fmt_size(ddx.nbytes))
+        dtotal += ddx.nbytes
+print("total data memory = ", fmt_size(dtotal))
+
 print('ecore = ', ecore)
 print('orb_sym = ', orb_sym)
 
@@ -147,6 +179,14 @@ for ttx in tt1 + tt2:
     driver.integral_symmetrize(orb_syms, hxe=ttx, iprint=1)
 dt, ecore, ncas, n_elec = SimilarityTransform.make_sz(h1e, g2e, ecore, tt1, tt2, scratch,
     n_elec, ncore=ncore, ncas=ncas, st_type=STTypes.%s, iprint=2)
+del h1e, g2e, tt1, tt2
+
+try:
+    import psutil
+    mem = psutil.Process(os.getpid()).memory_info().rss
+    print("pre-dmrg memory usage = ", fmt_size(mem))
+except ImportError:
+    pass
 
 print("PART TIME (ST)  = %%20.3f" %% (time.perf_counter() - txx))
 txx = time.perf_counter()
