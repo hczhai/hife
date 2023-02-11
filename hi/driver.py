@@ -708,14 +708,19 @@ class HFDriver(BaseDriver):
         pre = self.pre_info()
         lr = self.lr_dirs()
         self.to_dir(dox="local")
+        exact = False
         if len(args) == 1:
             sec_key = args[0]
         elif len(args) >= 2:
             sec_key = "%s-%s" % (args[0], args[1])
+            if len(args) >= 3 and args[2] == "exact":
+                exact = True
         else:
             sec_key = None
         for k, v in pre.items():
             if sec_key is not None and sec_key not in k:
+                continue
+            if exact and sec_key != k:
                 continue
             if '-' not in k:
                 continue
