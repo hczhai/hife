@@ -213,7 +213,7 @@ class HFDriver(BaseDriver):
         }
         optl = [ "smearing", "smearing_conv_tol", "x2c", "dftd3",
             "smearing_method", "smearing_max_cycle", "newton_max_cycle",
-            "dimer_init", "dimer_spin", "dimer_type", "direct_newton",
+            "dimer_init", "dimer_idx", "dimer_spin", "dimer_type", "direct_newton",
             "newton_conv", "ecp", "pg" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage" ]:

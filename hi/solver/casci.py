@@ -197,6 +197,11 @@ scf_dmao = np.load("%s/mf_dmao.npy")
 scf_dmlo = make_basis.transform_rdm1_to_lo_mol(scf_dmao, coeff, mf.get_ovlp())
 dmcas = scf_dmlo[:, mc.ncore:mc.ncore + mc.ncas, mc.ncore:mc.ncore + mc.ncas]
 
+print('idemponency of dmcas[0]: %%s' %% np.linalg.norm(dmcas[0].dot(dmcas[0]) - dmcas[0]))
+print('idemponency of dmcas[1]: %%s' %% np.linalg.norm(dmcas[1].dot(dmcas[1]) - dmcas[1]))
+print('trace of dmcas[0]: %%s' %% np.trace(dmcas[0]))
+print('trace of dmcas[1]: %%s' %% np.trace(dmcas[1]))
+
 class UCCSolver:
     def __init__(self, ccsd_t=False, dmcas=None):
         self.ccsd_t = ccsd_t

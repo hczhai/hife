@@ -11,42 +11,10 @@ mf.conv_tol = %s
 """
 
 MF_DIMER_INIT = """
-spin_bak = mol.spin
-mol.spin = 0
-mol.build()
 
-import numpy as np
+from pyblock2._pyscf import scf as b2scf
+dm = b2scf.get_metal_init_guess(mol, orb="%s", atom_idxs=[%s], coupling="%s", atomic_spin=%s)
 
-rmf = scf.RHF(mol)
-dm0 = rmf.get_init_guess(key="atom")
-dm0 = np.array([dm0, dm0]) * 0.5
-idx0 = mol.search_ao_label("0 %s.*")
-idx1 = mol.search_ao_label("1 %s.*")
-
-from pyscf import lo
-from libdmet.basis_transform import make_basis
-
-ld = lo.orth_ao(mol, 'lowdin', pre_orth_ao='SCF')
-dl0 = make_basis.transform_rdm1_to_lo_mol(dm0, ld, rmf.get_ovlp())
-
-dspin = float(%s) / 2
-afm = %s
-
-if afm:
-    dl0[0][idx0, idx0] += dspin / len(idx0)
-    dl0[0][idx1, idx1] -= dspin / len(idx1)
-    dl0[1][idx0, idx0] -= dspin / len(idx0)
-    dl0[1][idx1, idx1] += dspin / len(idx1)
-else:
-    dl0[0][idx0, idx0] += dspin / len(idx0)
-    dl0[0][idx1, idx1] += dspin / len(idx1)
-    dl0[1][idx0, idx0] -= dspin / len(idx0)
-    dl0[1][idx1, idx1] -= dspin / len(idx1)
-
-dm = make_basis.transform_rdm1_to_ao_mol(dl0, ld)
-
-mol.spin = spin_bak
-mol.build()
 """
 
 MF_SMEAR = """
@@ -68,6 +36,10 @@ np.save("mo_coeff.npy", mf.mo_coeff)
 np.save("mo_energy.npy", mf.mo_energy)
 np.save("e_tot.npy", mf.e_tot)
 np.save("mf_dmao.npy", dm)
+
+from pyblock2._pyscf import scf as b2scf
+b2scf.mulliken_pop_dmao(mol, dm)
+
 """
 
 def write(fn, pmf):
@@ -133,8 +105,10 @@ def write(fn, pmf):
 
         if "dimer_init" in pmf:
             f.write(MF_DIMER_INIT % (
-                pmf["dimer_init"], pmf["dimer_init"],
-                pmf["dimer_spin"], pmf["dimer_type"].lower() == "afm"
+                pmf["dimer_init"],
+                pmf.get("dimer_idx", "0:1").replace(":", ", "),
+                {"afm": "+-", "fm": "++"}.get(pmf["dimer_type"].lower(), pmf["dimer_type"].lower()),
+                pmf["dimer_spin"],
             ))
         else:
             f.write("dm = None\n")
