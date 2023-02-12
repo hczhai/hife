@@ -11,10 +11,8 @@ mf.conv_tol = %s
 """
 
 MF_DIMER_INIT = """
-
 from pyblock2._pyscf import scf as b2scf
 dm = b2scf.get_metal_init_guess(mol, orb="%s", atom_idxs=[%s], coupling="%s", atomic_spin=%s)
-
 """
 
 MF_SMEAR = """
