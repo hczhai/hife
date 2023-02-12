@@ -746,7 +746,7 @@ class HFDriver(BaseDriver):
                     for xgl in xg:
                         if xgl.startswith("NAO"):
                             extra += " nao = " + xgl.split('=')[-1].strip()
-                        elif xgl.startswith("NELEC"):
+                        elif xgl.startswith("NELEC") and "BEFORE" not in xgl and "AFTER" not in xgl:
                             extra += " nelec = %d" % sum([int(x) for x in xgl.split('=')[-1].strip()[1:-1].split(', ')])
                         elif "-> CAS" in xgl:
                             extra += " " + xgl.strip()
