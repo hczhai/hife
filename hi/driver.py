@@ -115,6 +115,8 @@ class HFDriver(BaseDriver):
             return
         if self.task in [ "sync", "show", "check", "clean" ]:
             return
+        if self.task == "log" and "exact" in self.args:
+            return
         self.to_dir(dox="local")
         if os.path.isfile("./CMD-HISTORY"):
             ftime = os.path.getmtime("./CMD-HISTORY")
