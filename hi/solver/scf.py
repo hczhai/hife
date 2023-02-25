@@ -145,12 +145,17 @@ def write(fn, pmf):
         
         if "direct_newton" in pmf:
             f.write("mf = mf.newton()\n")
+            if "newton_conv" in pmf:
+                f.write("mf.conv_tol = %s\n" % pmf["newton_conv"])
+            if "newton_conv_grad" in pmf:
+                f.write("mf.conv_tol_grad = %s\n" % pmf["newton_conv_grad"])
         f.write(MF_FINAL)
 
         if "newton_conv" in pmf:
             f.write("mf = mf.newton()\n")
             f.write("mf.conv_tol = %s\n" % pmf["newton_conv"])
-            f.write("mf.conv_tol_grad = %s\n" % pmf["newton_conv_grad"])
+            if "newton_conv_grad" in pmf:
+                f.write("mf.conv_tol_grad = %s\n" % pmf["newton_conv_grad"])
             if "newton_max_cycle" in pmf:
                 f.write("mf.max_cycle = %s\n" % pmf["newton_max_cycle"])
             f.write(MF_FINAL)
