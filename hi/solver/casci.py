@@ -11,6 +11,7 @@ d3 = %s
 nactorb = None
 nactelec = None
 semi_canonical = False
+cascc_mf_relax = False
 """
 
 SEMI_CANON = """
@@ -165,6 +166,9 @@ class CCSolver:
             mf.mo_occ[0][:nelec[0]] += 1.0
             mf.mo_occ[1][:nelec[1]] += 1.0
 
+        if cascc_mf_relax:
+            mf.kernel()
+
         if semi_canonical:
             semi_canon(mf)
 
@@ -316,6 +320,9 @@ def write(fn, pmc, pmf, is_casci=True):
         if "cas_semi_canonical" in pmc:
             f.write("semi_canonical = True\n")
             f.write(SEMI_CANON)
+
+        if "cascc_mf_relax" in pmc:
+            f.write("cascc_mf_relax = True\n")
 
         lde = pmc["load_coeff"]
         if "/" not in lde:
