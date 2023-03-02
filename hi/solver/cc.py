@@ -157,6 +157,7 @@ nat_with_pg = False
 save_amps = False
 xcc_nelec = None
 xcc_ncas = None
+no_cc = False
 """
 
 SEMI_CANON = """
@@ -240,6 +241,10 @@ if not is_restart:
 CC = """
 print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
 
+print('ref energy E = ', mf.energy_tot())
+if no_cc:
+    quit()
+
 from pyscf import cc
 
 if xcc_ncas is not None:
@@ -258,6 +263,10 @@ mc.max_cycle = %s
 
 CC_FROZEN = """
 print('mf occ', np.sum(mf.mo_occ, axis=-1), mf.mo_occ)
+
+print('ref energy', mf.energy_tot())
+if no_cc:
+    quit()
 
 from pyscf import cc, scf
 
@@ -474,6 +483,9 @@ def write(fn, pmc, pmf):
 
         if "save_amps" in pmc:
             f.write("save_amps = True\n")
+
+        if "no_cc" in pmc:
+            f.write("no_cc = True\n")
 
         if "KS" in mme:
             if "U" in mme:
