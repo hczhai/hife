@@ -59,3 +59,7 @@ if [ "$?" = "0" ]; then
 else
     echo "ERROR TERMINATION"
 fi
+
+if [ "@BLOCK2" = "1" ]; then
+    cp @TMPDIR/node0/1pdm.npy ${SCPT}.1pdm.${TJ}.npy
+fi
