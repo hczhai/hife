@@ -754,6 +754,8 @@ class HFDriver(BaseDriver):
                             ex = xgl.split("=")[1].split()[0]
                             if "<S^2> = " in xgl:
                                 ssq = xgl.split("<S^2> = ")[-1].split()[0]
+                        elif xgl.startswith("CCSD <S^2>"):
+                            ssq = xgl.split("<S^2> = ")[-1].strip()
                         elif "SCF not converged" in xgl:
                             ex = "!!! NO CONV !!!"
                         elif ex == "!!! NO CONV !!!" and "SCF energy" in xgl:
