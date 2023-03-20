@@ -867,7 +867,7 @@ class HFDriver(BaseDriver):
             if k.startswith("select-") and "cas_list" in v:
                 print("   ACT %s --- (%do, %de)" % (v["cas_list"], acto, acte))
             if k.startswith("select-") and "select_occ_range" in v:
-                soa, sob = [float(v["select_occ_range"][iix]) for iix in range(2)]
+                soa, sob = [float(v["select_occ_range"].split(":")[iix]) for iix in range(2)]
                 print("   ACT OCC %.2f ~ %.2f --- (%do, %de)" % (soa, sob, acto, acte))
             if k.startswith("avas-"):
                 print("   ACT %s --- (%do, %de)" % (v["ao_labels"], acto, acte))
