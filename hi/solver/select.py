@@ -37,6 +37,7 @@ beta = False
 uno = False
 average_occ = False
 loc_with_pg = False
+select_occ_range = None
 """
 
 SELECT = """
@@ -149,7 +150,13 @@ def psort(ova, fav, pT, coeff, orb_sym=None):
         orb_sym = orb_sym[index]
     return ncoeff, nocc, enorb, orb_sym
 
-if cas_list is None:
+if select_occ_range is not None:
+    assert cas_list is None
+    assert nactorb is not None
+    assert nactelec is not None
+    soa, sob = select_occ_range
+    cas_list = list(np.array(list(range(0, len(mo_occ))))[(mo_occ >= soa) & (mo_occ <= sob)])
+elif cas_list is None:
     assert nactorb is not None
     assert nactelec is not None
     ncore = (mol.nelectron - nactelec) // 2
@@ -307,12 +314,15 @@ def write(fn, pma):
         if "loc_with_pg" in pma:
             f.write("loc_with_pg = True\n")
 
+        if "select_occ_range" in pma:
+            f.write("select_occ_range = [%s, %s]\n" % tuple(pma["select_occ_range"].split(":")))
+
         f.write("do_loc = %s\n" % (False if "no_loc" in pma else True))
 
         f.write(PM_LOC)
         f.write(SELECT)
 
-        if "uno" not in pma or "nactorb" in pma or "nactelec" in pma or "cas_list" in pma:
+        if "uno" not in pma or "nactorb" in pma or "nactelec" in pma or "cas_list" in pma or "select_occ_range" in pma:
             f.write(SELECT2)
 
         f.write(TIME_ED)

@@ -399,7 +399,8 @@ class HFDriver(BaseDriver):
         opts = {}
         optl = [ "load_mf", "load_coeff", "no_loc", "cas_list",
             "nactorb", "nactelec", "split_low", "split_high",
-            "alpha", "beta", "uno", "average_occ", "loc_with_pg" ] + list(opts.keys())
+            "alpha", "beta", "uno", "average_occ", "loc_with_pg",
+            "select_occ_range" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf", "load_coeff" ]:
             if k not in opts:
@@ -865,6 +866,9 @@ class HFDriver(BaseDriver):
                 print("   PLOT --- cd %s/runs/%s; jmol orbs.spt; cd -" % (lr[0], k))
             if k.startswith("select-") and "cas_list" in v:
                 print("   ACT %s --- (%do, %de)" % (v["cas_list"], acto, acte))
+            if k.startswith("select-") and "select_occ_range" in v:
+                soa, sob = [float(v["select_occ_range"][iix]) for iix in range(2)]
+                print("   ACT OCC %.2f ~ %.2f --- (%do, %de)" % (soa, sob, acto, acte))
             if k.startswith("avas-"):
                 print("   ACT %s --- (%do, %de)" % (v["ao_labels"], acto, acte))
             xf = "%s/runs/%s/JOBIDS" % (lr[0], k)
