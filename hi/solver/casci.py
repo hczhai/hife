@@ -174,6 +174,7 @@ class CCSolver:
 
         self.cc = cc.CCSD(mf)
         self.cc.level_shift = %s
+        self.cc.incore_complete = True
         self.cc.run()
         if self.ccsd_t:
             e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
@@ -228,6 +229,7 @@ class UCCSolver:
         self.cc = cc.UCCSD(mf)
         self.cc.level_shift = %s
         self.cc.max_cycle = %s
+        self.cc.incore_complete = True
         self.cc.run()
         if self.ccsd_t:
             e_ccsd_t = self.cc.e_tot + self.cc.ccsd_t()
