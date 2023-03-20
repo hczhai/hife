@@ -152,8 +152,8 @@ def psort(ova, fav, pT, coeff, orb_sym=None):
 
 if select_occ_range is not None:
     assert cas_list is None
-    assert nactorb is not None
-    assert nactelec is not None
+    assert nactorb is None
+    assert nactelec is None
     soa, sob = select_occ_range
     cas_list = list(np.array(list(range(0, len(mo_occ))))[(mo_occ >= soa) & (mo_occ <= sob)])
 elif cas_list is None:
