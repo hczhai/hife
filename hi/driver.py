@@ -14,15 +14,15 @@ def get_host():
     for k in keys:
         if k in xhost:
             return k
-    keys = [('cm.cluster', 'hpc')]
+    keys = [('cm.cluster', 'hpc'), ('.chn', 'perlmutter')]
     for k, v in keys:
         if k in xhost:
             return v
     return 'unknown'
 
-host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24, 'cori': 32 }
-host_part = {'pauling': 'serial,parallel', 'hpc': 'any', 'mac': '', 'cori': '' }
-host_def_queue = {'pauling': 'normal', 'cori': 'regular', 'hpc': 'normal', 'mac': ''}
+host_cores = {'pauling': 28, 'mac': 4, 'hpc': 24, 'cori': 32, 'perlmutter': 128 }
+host_part = {'pauling': 'serial,parallel', 'hpc': 'any', 'mac': '', 'cori': '', 'perlmutter': '' }
+host_def_queue = {'pauling': 'normal', 'cori': 'regular', 'hpc': 'normal', 'mac': '', 'perlmutter': 'regular' }
 extra_basis = { 'def2-sv(p)': 'def2-svpp.dat' }
 
 def time_span_str(time, no_sec=False):
