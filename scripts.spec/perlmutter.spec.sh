@@ -34,8 +34,6 @@ module unload darshan
 source /global/homes/h/hzhai/changroup/program/base-plmt/bin/activate
 
 export PYTHONPATH=/global/homes/h/hzhai/changroup/program/block2/build-plmt:$PYTHONPATH
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-
 export PYSCF_TMPDIR=@TMPDIR
 
 which python3
