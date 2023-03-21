@@ -31,6 +31,8 @@ module load PrgEnv-gnu/8.3.3
 module load cray-pmi
 module unload darshan
 
+source /global/homes/h/hzhai/changroup/program/base-plmt/bin/activate
+
 export PYTHONPATH=/global/homes/h/hzhai/changroup/program/block2/build-plmt:$PYTHONPATH
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
