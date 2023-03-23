@@ -51,7 +51,7 @@ echo HOST_NAME = $(hostname)
 echo PWD = $(pwd)
 echo SLURM_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
-export XRUN=mpirun
-export PYSCF_MPIPREFIX=mpirun
+export XRUN=srun
+export PYSCF_MPIPREFIX=srun
 
 ### end:prelude.main
