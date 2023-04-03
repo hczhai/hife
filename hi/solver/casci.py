@@ -417,6 +417,8 @@ def write(fn, pmc, pmf, is_casci=True):
                 f.write("    mcf.block_extra_keyword += ['warmup occ']\n")
                 f.write("    mcf.block_extra_keyword += ['occ ' + ' '.join('%.3f' % x for x in actocc)]\n")
                 f.write("    mcf.block_extra_keyword += ['cbias %s']\n" % pmc["dmrg-occ-bias"])
+            if "dmrg-restart" in pmc:
+                f.write("    mcf.block_extra_keyword += ['fullrestart']\n")
 
         if "nonspinadapted" in pmc:
             f.write("for mcf in mcfs:\n")
