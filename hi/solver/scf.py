@@ -133,6 +133,8 @@ def write(fn, pmf):
                 f.write("mf.max_cycle = %s\n" % mc)
                 if "dftd3" in pmf:
                     f.write("mf = dftd3.dftd3(mf)\n")
+                    if pmf["func"].lower() == 'm06':
+                        f.write("mf.version = 3\n")
                 f.write(MF_FINAL + "\n")
 
         f.write(MF % (mme, pmf["conv_tol"]))
@@ -142,6 +144,8 @@ def write(fn, pmf):
             f.write("mf.max_cycle = %s\n" % pmf["max_cycle"])
         if "dftd3" in pmf:
             f.write("mf = dftd3.dftd3(mf)\n")
+            if pmf["func"].lower() == 'm06':
+                f.write("mf.version = 3\n")
         
         if "direct_newton" in pmf:
             f.write("mf = mf.newton()\n")
