@@ -465,7 +465,7 @@ class HFDriver(BaseDriver):
             "no_canonicalize", "dryrun", "dmrg-sch-sweeps", "dmrg-sch-maxms",
             "dmrg-sch-tols", "dmrg-sch-noises", "dmrg-max-iter", "dmrg-tto", "dmrg-tol",
             "dmrg-no-2pdm", "dmrg-1pdm", "dmrg-rev-sweeps", "dmrg-rev-maxms",
-            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf",
+            "dmrg-rev-tols", "dmrg-rev-noises", "dmrg-rev-iter", "dmrg-csf", "dmrg-occ-bias",
             "cas_ccsd", "cas_ccsd_t", "cas_uccsd", "cas_uccsd_t",
             "cas_ucc_mf_max_cycle", "cas_ucc_cc_max_cycle", "cascc_mf_relax",
             "nonspinadapted", "level_shift", "cas_semi_canonical" ] + list(opts.keys())

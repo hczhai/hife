@@ -66,6 +66,12 @@ for fname in ["mo_coeff.npy", "lo_coeff.npy", "nat_coeff.npy"]:
         coeff = np.load(lde + "/" + fname)
         break
 
+for fname in ["mf_occ.npy", "lo_occ.npy", "nat_occ.npy"]:
+    if os.path.isfile(lde + "/" + fname):
+        print("use: " + lde + "/" + fname)
+        mo_occ = np.load(lde + "/" + fname)
+        break
+
 if nactelec is None or nactelec is None:
     print("use: " + lde + "/active_space.npy")
     nactorb, nactelec = np.load(lde + "/active_space.npy")
@@ -95,6 +101,7 @@ mc.conv_tol = %s
 mc.max_cycle_macro = %s
 mc.canonicalization = %s
 mc.natorb = %s
+actocc = mo_occ[mc.ncore:mc.ncore + mc.ncas]
 
 mcfs = [mc.fcisolver]
 """
@@ -399,12 +406,17 @@ def write(fn, pmc, pmf, is_casci=True):
                 f.write("    mcf.scheduleNoises = %s\n" % ([float(pmc["dmrg-sch-noises"])] * len(pmc["dmrg-sch-sweeps"].split(";"))))
             f.write("    mcf.maxIter = %s\n" % pmc["dmrg-max-iter"])
             f.write("    mcf.twodot_to_onedot = %s\n" % pmc["dmrg-tto"])
+            f.write("    mcf.block_extra_keyword = []\n")
             if "dmrg-tol" in pmc:
                 f.write("    mcf.tol = %s\n" % pmc["dmrg-tol"])
             if "dmrg-no-2pdm" in pmc:
                 f.write("    mcf.twopdm = False\n")
             if "dmrg-1pdm" in pmc:
-                f.write("    mcf.block_extra_keyword = ['%s']\n" % "onepdm")
+                f.write("    mcf.block_extra_keyword += ['%s']\n" % "onepdm")
+            if "dmrg-occ-bias" in pmc:
+                f.write("    mcf.block_extra_keyword += ['warmup occ']\n")
+                f.write("    mcf.block_extra_keyword += ['occ ' + ' '.join('%.3f' % x for x in actocc)]\n")
+                f.write("    mcf.block_extra_keyword += ['cbias %s']\n" % pmc["dmrg-occ-bias"])
 
         if "nonspinadapted" in pmc:
             f.write("for mcf in mcfs:\n")
