@@ -259,7 +259,7 @@ else:
 
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
-cc.incore_complete = True
+mc.incore_complete = True
 """
 
 CC_FROZEN = """
@@ -283,7 +283,7 @@ else:
     mc = cc.CCSD(mf, frozen=nfrozen)
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
-cc.incore_complete = True
+mc.incore_complete = True
 """
 
 CC_FINAL = """

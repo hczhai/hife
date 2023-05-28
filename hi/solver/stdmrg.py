@@ -21,6 +21,8 @@ xcc_nelec = None
 xcc_ncas = None
 
 txx = time.perf_counter()
+do_ccsd_t = True
+do_st_extrap = False
 """
 
 ST_LOAD_COEFF = """
@@ -82,27 +84,29 @@ mc.kernel(eris=eris)
 tt1, tt2 = mc.t1, mc.t2
 print('ECCSD    = ', mc.e_tot)
 
-e_t_all = mc.ccsd_t(eris=eris)
-print("ECCSD(T) = ", e_t_all + mc.e_tot)
+if do_ccsd_t:
+    e_t_all = mc.ccsd_t(eris=eris)
+    print("ECCSD(T) = ", e_t_all + mc.e_tot)
 
-# from pyblock2.cc.uccsd import wick_t3_amps, wick_ccsd_t
-# t3 = wick_t3_amps(mc, mc.t1, mc.t2, eris=eris)
-# for t3x in t3:
-#     ged = t3x.shape[:3]
-#     xst, xed = ncore, ncore + ncas
-#     t3x[xst:, xst:, xst:, :xed - ged[0], :xed - ged[1], :xed - ged[2]] = 0
-# e_t_no_cas = wick_ccsd_t(mc, mc.t1, mc.t2, eris=eris, t3=t3)
+    # from pyblock2.cc.uccsd import wick_t3_amps, wick_ccsd_t
+    # t3 = wick_t3_amps(mc, mc.t1, mc.t2, eris=eris)
+    # for t3x in t3:
+    #     ged = t3x.shape[:3]
+    #     xst, xed = ncore, ncore + ncas
+    #     t3x[xst:, xst:, xst:, :xed - ged[0], :xed - ged[1], :xed - ged[2]] = 0
+    # e_t_no_cas = wick_ccsd_t(mc, mc.t1, mc.t2, eris=eris, t3=t3)
 
-# require a custom version of pyscf
-from pyscf.cc.uccsd_t import _gen_contract_aaa
-import inspect
-assert "cas_exclude" in inspect.getfullargspec(_gen_contract_aaa).args
+    # require a custom version of pyscf
+    # https://github.com/hczhai/pyscf/tree/ccsd_t_cas
+    from pyscf.cc.uccsd_t import _gen_contract_aaa
+    import inspect
+    assert "cas_exclude" in inspect.getfullargspec(_gen_contract_aaa).args
 
-eris.cas_exclude = ncore, mc.t1[0].shape[-1] - (ncore + ncas - mc.t1[0].shape[0])
-print('\\ncas_exclude = ', eris.cas_exclude)
-e_t_no_cas = mc.ccsd_t(eris=eris)
+    eris.cas_exclude = ncore, mc.t1[0].shape[-1] - (ncore + ncas - mc.t1[0].shape[0])
+    print('\\ncas_exclude = ', eris.cas_exclude)
+    e_t_no_cas = mc.ccsd_t(eris=eris)
 
-print("E(T) = ", e_t_no_cas, '\\n')
+    print("E(T) = ", e_t_no_cas, '\\n')
 del mc
 del eris
 """
@@ -237,6 +241,14 @@ if e_t_no_cas is not None:
     print('EST(T) = ', e_st + e_t_no_cas)
 print("PART TIME (DMRG)  = %%20.3f" %% (time.perf_counter() - txx))
 
+if do_st_extrap:
+    ket = ket.deep_copy('GS-TMP')
+    bond_dims = [600] * 4 + [500] * 4 + [400] * 4 + [300] * 4 + [200] * 4 + [100] * 4
+    noises = [0] * 24
+    thrds = [1e-8] * 24
+    energy = driver.dmrg(mpo, ket, n_sweeps=24, bond_dims=bond_dims, noises=noises,
+        dav_type="NonHermitian", tol=0, thrds=thrds, iprint=2)
+
 for k in os.listdir(scratch):
     if '.PART.' in k:
         os.remove(scratch + "/" + k)
@@ -288,6 +300,12 @@ def write(fn, pmc, pmf):
 
         if "max_memory" in pmc:
             f.write("mf.max_memory = %s\n" % pmc["max_memory"])
+
+        if "no_ccsd_t" in pmc:
+            f.write("do_ccsd_t = False\n")
+
+        if "do_st_extrap" in pmc:
+            f.write("do_st_extrap = True\n")
 
         if "KS" in mme or "RHF" in mme:
             f.write("mfhf = scf.UHF(mol)\n")

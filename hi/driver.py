@@ -251,7 +251,7 @@ class HFDriver(BaseDriver):
         opts = { "frozen": "0", "max_cycle": "1000" }
         optl = [ "load_mf", "load_coeff", "load_amps",
             "spin", "max_memory", "ncore", "ncas", "from_mp2",
-            "xcc_nelec", "xcc_ncas", "st_type" ] + list(opts.keys())
+            "xcc_nelec", "xcc_ncas", "st_type", "no_ccsd_t", "do_st_extrap" ] + list(opts.keys())
         opts.update(read_opts(args, def_pos, optl))
         for k in [ "stage", "load_mf" ]:
             if k not in opts:
