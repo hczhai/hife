@@ -243,10 +243,10 @@ print("PART TIME (DMRG)  = %%20.3f" %% (time.perf_counter() - txx))
 
 if do_st_extrap:
     ket = ket.deep_copy('GS-TMP')
-    bond_dims = [600] * 4 + [500] * 4 + [400] * 4 + [300] * 4 + [200] * 4 + [100] * 4
-    noises = [0] * 24
-    thrds = [1e-12] * 24
-    energy = driver.dmrg(mpo, ket, n_sweeps=24, bond_dims=bond_dims, noises=noises,
+    bond_dims = [800] * 4 + [700] * 4 + [600] * 4 + [500] * 4 + [400] * 4 + [300] * 4 + [200] * 4 + [100] * 4
+    noises = [0] * 32
+    thrds = [1e-12] * 32
+    energy = driver.dmrg(mpo, ket, n_sweeps=32, bond_dims=bond_dims, noises=noises,
         dav_type="NonHermitian", tol=0, thrds=thrds, iprint=2)
 
 for k in os.listdir(scratch):
