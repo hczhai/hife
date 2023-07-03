@@ -158,6 +158,7 @@ save_amps = False
 xcc_nelec = None
 xcc_ncas = None
 no_cc = False
+do_df = False
 """
 
 SEMI_CANON = """
@@ -257,6 +258,9 @@ if xcc_ncas is not None:
 else:
     mc = cc.CCSD(mf)
 
+if do_df:
+    mc = mc.density_fit()
+
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
 mc.incore_complete = True
@@ -281,6 +285,10 @@ if xcc_ncas is not None:
         mc = XRCCSD(mf, xcc_ncas, xcc_nelec, frozen=nfrozen)
 else:
     mc = cc.CCSD(mf, frozen=nfrozen)
+
+if do_df:
+    mc = mc.density_fit()
+
 mc.diis_file = lib.param.TMPDIR + '/ccdiis.h5'
 mc.max_cycle = %s
 mc.incore_complete = True
@@ -488,6 +496,9 @@ def write(fn, pmc, pmf):
 
         if "no_cc" in pmc:
             f.write("no_cc = True\n")
+
+        if "do_df" in pmc:
+            f.write("do_df = True\n")
 
         if "KS" in mme:
             if "U" in mme:
