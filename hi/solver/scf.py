@@ -150,6 +150,10 @@ def write(fn, pmf):
                 f.write("mf.with_dftd3.version = 3\n")
             elif pmf["func"].lower() == 'b3lyps':
                 f.write("mf.with_dftd3.xc = 'B3LYP'\n")
+
+        if "cosmo" in pmf:
+            f.write("mf = mf.ddCOSMO()\n")
+            f.write("mf.with_solvent.eps = %s\n" % pmf["cosmo"])
         
         if "direct_newton" in pmf:
             f.write("mf = mf.newton()\n")
